@@ -171,24 +171,40 @@ app.post('/api/interactions', async (req, res) => {
                 });
             }
             
-            // Pour toutes les autres commandes, ne rien faire
-            // Elles sont gérées par le bot Discord normalement via WebSocket
-            console.log('[INTERACTIONS] Commande non-activity ignorée (gérée par le bot):', commandName);
-            return res.status(200).json({ type: 1 }); // ACK silencieux
+            // IMPORTANT: Si l'endpoint est configuré comme endpoint principal dans Discord Developer Portal,
+            // Discord enverra TOUTES les interactions ici. Dans ce cas, on doit retourner un ACK immédiat
+            // pour éviter l'erreur "n'a pas répondu à temps", mais le bot ne pourra pas traiter l'interaction
+            // car elle n'arrivera pas via WebSocket.
+            // 
+            // SOLUTION: Ne PAS configurer cet endpoint comme endpoint principal d'interactions.
+            // Il doit être uniquement pour les Activities (Activity URL Override).
+            // Les interactions normales doivent passer par WebSocket via discord.js.
+            //
+            // Si vous avez déjà configuré cet endpoint comme principal, vous devez le désactiver dans
+            // Discord Developer Portal > Application > General Information > Interactions Endpoint URL
+            // et utiliser uniquement "Activity URL Override" pour les Activities.
+            console.warn('[INTERACTIONS] ⚠️ Commande non-activity reçue:', commandName);
+            console.warn('[INTERACTIONS] ⚠️ Cet endpoint ne devrait recevoir QUE /activity');
+            console.warn('[INTERACTIONS] ⚠️ Vérifiez que l\'endpoint n\'est PAS configuré comme endpoint principal');
+            console.warn('[INTERACTIONS] ⚠️ Il doit être uniquement dans "Activity URL Override"');
+            
+            // Retourner un ACK pour éviter l'erreur "n'a pas répondu à temps"
+            // Mais l'interaction ne sera PAS traitée par le bot si l'endpoint est configuré comme principal
+            return res.status(200).json({ type: 1 }); // ACK immédiat
         }
         
         // Type 3 = MESSAGE_COMPONENT (boutons, menus)
         // Ces interactions sont gérées par le bot Discord via WebSocket, pas par cet endpoint
         if (interaction.type === 3) {
-            console.log('[INTERACTIONS] Composant reçu (ignoré, géré par le bot):', interaction.data?.custom_id);
-            return res.status(200).json({ type: 1 }); // ACK silencieux
+            console.warn('[INTERACTIONS] ⚠️ Composant reçu (ne devrait pas arriver ici):', interaction.data?.custom_id);
+            return res.status(200).json({ type: 1 }); // ACK immédiat
         }
         
         // Type 5 = MODAL_SUBMIT
         // Ces interactions sont gérées par le bot Discord via WebSocket, pas par cet endpoint
         if (interaction.type === 5) {
-            console.log('[INTERACTIONS] Modal soumis (ignoré, géré par le bot):', interaction.data?.custom_id);
-            return res.status(200).json({ type: 1 }); // ACK silencieux
+            console.warn('[INTERACTIONS] ⚠️ Modal soumis (ne devrait pas arriver ici):', interaction.data?.custom_id);
+            return res.status(200).json({ type: 1 }); // ACK immédiat
         }
         
         // Réponse par défaut (ACK)
