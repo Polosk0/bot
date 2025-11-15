@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const fetch = require('node-fetch');
 const path = require('path');
+const nacl = require('tweetnacl');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,6 +11,7 @@ const PORT = process.env.PORT || 3000;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'https://emynona.shop/auth/callback';
+const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
 const GUILD_ID = process.env.GUILD_ID;
 
 // Configuration Bot API
@@ -36,16 +38,38 @@ app.use((req, res, next) => {
     next();
 });
 
+// Fonction pour vérifier la signature Discord
+function verifyDiscordSignature(signature, timestamp, body, publicKey) {
+    if (!publicKey) {
+        console.warn('[INTERACTIONS] DISCORD_PUBLIC_KEY non définie, vérification de signature désactivée');
+        return true; // Accepter si pas de clé publique configurée
+    }
+    
+    try {
+        const message = Buffer.from(timestamp + body);
+        const signatureBuffer = Buffer.from(signature, 'hex');
+        const publicKeyBuffer = Buffer.from(publicKey, 'hex');
+        
+        return nacl.sign.detached.verify(message, signatureBuffer, publicKeyBuffer);
+    } catch (error) {
+        console.error('[INTERACTIONS] Erreur lors de la vérification de signature:', error);
+        return false;
+    }
+}
+
 // Endpoint Discord Interactions (pour Discord Activities)
 app.post('/api/interactions', async (req, res) => {
     // Définir les headers de réponse immédiatement
     res.setHeader('Content-Type', 'application/json');
     
     try {
+        const signature = req.headers['x-signature-ed25519'];
+        const timestamp = req.headers['x-signature-timestamp'];
+        
         // Logger les headers pour debug
         console.log('[INTERACTIONS] Headers reçus:', {
-            'x-signature-ed25519': req.headers['x-signature-ed25519'] ? 'présent' : 'absent',
-            'x-signature-timestamp': req.headers['x-signature-timestamp'] ? 'présent' : 'absent',
+            'x-signature-ed25519': signature ? 'présent' : 'absent',
+            'x-signature-timestamp': timestamp ? 'présent' : 'absent',
             'content-type': req.headers['content-type'],
             'user-agent': req.headers['user-agent']
         });
@@ -76,21 +100,24 @@ app.post('/api/interactions', async (req, res) => {
             return res.status(400).json({ error: 'Invalid JSON' });
         }
         
+        // Vérifier la signature si présente (requis par Discord pour la vérification)
+        if (signature && timestamp) {
+            const isValid = verifyDiscordSignature(signature, timestamp, body, DISCORD_PUBLIC_KEY);
+            if (!isValid) {
+                console.error('[INTERACTIONS] ❌ Signature invalide');
+                return res.status(401).json({ error: 'Invalid signature' });
+            }
+            console.log('[INTERACTIONS] ✅ Signature vérifiée');
+        } else {
+            // Pour les tests locaux sans signature, on accepte quand même
+            console.warn('[INTERACTIONS] ⚠️ Pas de signature (test local?)');
+        }
+        
         // Type 1 = PING (vérification Discord) - DOIT être la première chose à vérifier
         if (interaction.type === 1) {
             console.log('[INTERACTIONS] ✅ PING reçu, renvoi PONG immédiatement');
             // Réponse exacte requise par Discord : { type: 1 }
             return res.status(200).json({ type: 1 });
-        }
-        
-        // Vérification de la signature (optionnelle pour la vérification initiale)
-        const signature = req.headers['x-signature-ed25519'];
-        const timestamp = req.headers['x-signature-timestamp'];
-        
-        // Pour les interactions réelles (pas PING), on devrait vérifier la signature
-        // Mais pour l'instant, on accepte tout pour que la vérification Discord fonctionne
-        if (signature && timestamp) {
-            console.log('[INTERACTIONS] Signature présente (non vérifiée pour l\'instant)');
         }
         
         // Type 2 = APPLICATION_COMMAND (commande slash)
