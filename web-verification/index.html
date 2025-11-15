@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vérification - Emynona</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .discord-btn {
+            background: #5865F2;
+            transition: all 0.3s ease;
+        }
+        .discord-btn:hover {
+            background: #4752C4;
+            transform: translateY(-2px);
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full">
+        <!-- Logo et titre -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-white rounded-full mb-4 shadow-lg">
+                <i class="fab fa-discord text-4xl text-indigo-600"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-2">Vérification Emynona</h1>
+            <p class="text-indigo-100">Connectez-vous avec Discord pour accéder au serveur</p>
+        </div>
+
+        <!-- Carte principale -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8">
+            <!-- Étape 1: Connexion Discord -->
+            <div id="step1" class="text-center">
+                <div class="mb-6">
+                    <i class="fas fa-shield-alt text-4xl text-green-500 mb-4"></i>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Vérification Requise</h2>
+                    <p class="text-gray-600">Pour rejoindre le serveur Emynona, vous devez vous connecter avec votre compte Discord.</p>
+                </div>
+
+                <button id="discordLogin" class="discord-btn text-white font-semibold py-3 px-6 rounded-lg w-full mb-4 flex items-center justify-center">
+                    <i class="fab fa-discord text-xl mr-3"></i>
+                    Se connecter avec Discord
+                </button>
+
+                <div class="text-sm text-gray-500">
+                    <i class="fas fa-lock mr-2"></i>
+                    Vos données sont protégées et sécurisées
+                </div>
+            </div>
+
+            <!-- Étape 2: Vérification en cours -->
+            <div id="step2" class="text-center hidden">
+                <div class="mb-6">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                        <i class="fas fa-spinner fa-spin text-2xl text-blue-600"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Vérification en cours...</h2>
+                    <p class="text-gray-600">Nous vérifions votre compte Discord, veuillez patienter.</p>
+                </div>
+
+                <div class="bg-gray-100 rounded-lg p-4">
+                    <div class="flex items-center justify-center space-x-2">
+                        <div class="w-2 h-2 bg-blue-500 rounded-full pulse"></div>
+                        <div class="w-2 h-2 bg-blue-500 rounded-full pulse" style="animation-delay: 0.2s;"></div>
+                        <div class="w-2 h-2 bg-blue-500 rounded-full pulse" style="animation-delay: 0.4s;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Étape 3: Succès -->
+            <div id="step3" class="text-center hidden">
+                <div class="mb-6">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                        <i class="fas fa-check text-2xl text-green-600"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Vérification Réussie !</h2>
+                    <p class="text-gray-600">Vous pouvez maintenant accéder au serveur Discord.</p>
+                </div>
+
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-info-circle text-green-600 mr-2"></i>
+                        <span class="text-green-800 text-sm">Retournez sur Discord pour continuer</span>
+                    </div>
+                </div>
+
+                <button id="closeWindow" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg">
+                    Fermer cette fenêtre
+                </button>
+            </div>
+
+            <!-- Étape 4: Erreur -->
+            <div id="step4" class="text-center hidden">
+                <div class="mb-6">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+                        <i class="fas fa-exclamation-triangle text-2xl text-red-600"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Erreur de Vérification</h2>
+                    <p class="text-gray-600">Une erreur s'est produite lors de la vérification.</p>
+                </div>
+
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-600 mr-2"></i>
+                        <span class="text-red-800 text-sm" id="errorMessage">Erreur inconnue</span>
+                    </div>
+                </div>
+
+                <button id="retryBtn" class="discord-btn text-white font-semibold py-2 px-4 rounded-lg mr-2">
+                    Réessayer
+                </button>
+                <button id="closeWindow2" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg">
+                    Fermer
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8">
+            <p class="text-indigo-200 text-sm">
+                <i class="fas fa-shield-alt mr-1"></i>
+                Sécurisé par Emynona • 
+                <a href="#" class="hover:text-white transition-colors">Aide</a> • 
+                <a href="#" class="hover:text-white transition-colors">Support</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const DISCORD_CLIENT_ID = 'YOUR_DISCORD_CLIENT_ID'; // À remplacer
+        const REDIRECT_URI = window.location.origin + '/auth/callback';
+        const DISCORD_API_URL = 'https://discord.com/api/v10';
+
+        // Éléments DOM
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const step3 = document.getElementById('step3');
+        const step4 = document.getElementById('step4');
+        const discordLogin = document.getElementById('discordLogin');
+        const closeWindow = document.getElementById('closeWindow');
+        const closeWindow2 = document.getElementById('closeWindow2');
+        const retryBtn = document.getElementById('retryBtn');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Fonctions
+        function showStep(stepNumber) {
+            [step1, step2, step3, step4].forEach((step, index) => {
+                step.classList.toggle('hidden', index + 1 !== stepNumber);
+            });
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            showStep(4);
+        }
+
+        // Gestion de la connexion Discord
+        discordLogin.addEventListener('click', () => {
+            const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds%20guilds.join`;
+            window.location.href = discordAuthUrl;
+        });
+
+        // Gestion des boutons
+        closeWindow.addEventListener('click', () => {
+            window.close();
+        });
+
+        closeWindow2.addEventListener('click', () => {
+            window.close();
+        });
+
+        retryBtn.addEventListener('click', () => {
+            showStep(1);
+        });
+
+        // Vérifier si on revient de Discord
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const error = urlParams.get('error');
+
+        if (error) {
+            showError('Erreur d\'autorisation Discord: ' + error);
+        } else if (code) {
+            showStep(2);
+            // Ici, vous devrez envoyer le code à votre serveur pour l'échanger contre un token
+            // et vérifier l'utilisateur avec votre bot Discord
+            verifyUser(code);
+        }
+
+        async function verifyUser(code) {
+            try {
+                // Envoyer le code à votre API backend
+                const response = await fetch('/api/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code: code })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStep(3);
+                    // Optionnel: rediriger vers Discord après 3 secondes
+                    setTimeout(() => {
+                        window.close();
+                    }, 3000);
+                } else {
+                    showError(result.message || 'Erreur lors de la vérification');
+                }
+            } catch (error) {
+                console.error('Erreur de vérification:', error);
+                showError('Erreur de connexion au serveur');
+            }
+        }
+
+        // Animation d'entrée
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.style.opacity = '0';
+            document.body.style.transition = 'opacity 0.5s ease-in-out';
+            setTimeout(() => {
+                document.body.style.opacity = '1';
+            }, 100);
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+

@@ -1,0 +1,45 @@
+
+> discord-market-bot@1.0.0 dev C:\Users\Polosko\Desktop\BOT DISCORD EMYNONA
+> ts-node src/index.ts
+
+[INFO] Initialisation du bot...
+[INFO] Commandes chargées
+[INFO] Événements chargés
+[2025-11-14T22:40:14.275Z] [INFO] Initialisation de la base de données...
+[2025-11-14T22:40:14.275Z] [INFO] Base de données initialisée
+[INFO] Base de données initialisée
+[INFO] LogManager initialisé
+[INFO] InviteManager initialisé
+[INFO] WebhookManager initialisé
+[INFO] BackupManager initialisé
+[INFO] Bot connecté avec succès!
+[INFO] Bot initialisé avec succès!
+[2025-11-14T22:40:15.085Z] [WARN] [HTTP] Port 3001 déjà utilisé. Tentative sur 3002 (essai 1/5).
+(node:4504) DeprecationWarning: The ready event has been renamed to clientReady to distinguish it from the gateway READY event and will only emit under that name in v15. Please use clientReady instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2025-11-14T22:40:15.085Z] [WARN] [HTTP] Port 3002 déjà utilisé. Tentative sur 3003 (essai 2/5).
+[2025-11-14T22:40:15.086Z] [INFO] 🌐 Serveur HTTP démarré sur le port 3003
+[2025-11-14T22:40:15.086Z] [INFO] 📡 Webhook de vérification: http://localhost:3003/api/verify
+[2025-11-14T22:41:14.555Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:41:14.836Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+[2025-11-14T22:42:14.683Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:42:14.978Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+[2025-11-14T22:43:14.556Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:43:14.801Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+[2025-11-14T22:44:14.546Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:44:14.785Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+[2025-11-14T22:45:14.585Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:45:14.826Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+[2025-11-14T22:46:14.550Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:46:14.783Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+[2025-11-14T22:47:14.644Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:47:14.886Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+[2025-11-14T22:48:14.545Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:48:14.808Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+[2025-11-14T22:49:14.536Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:49:14.794Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+[2025-11-14T22:50:14.531Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:50:14.759Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+[2025-11-14T22:51:14.568Z] [DEBUG] Invitations rafraîchies pour 🌐 €mynona | Market: 3 invitations
+[2025-11-14T22:51:14.818Z] [DEBUG] Invitations rafraîchies pour test: 0 invitations
+^C ELIFECYCLE  Command failed with exit code 3221225786.

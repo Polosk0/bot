@@ -1,0 +1,265 @@
+require('dotenv').config();
+const express = require('express');
+const fetch = require('node-fetch');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Configuration Discord
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'http://localhost:3000/auth/callback';
+const GUILD_ID = process.env.GUILD_ID;
+
+// Configuration Bot API
+const BOT_API_URL = process.env.BOT_API_URL || 'http://localhost:3001';
+const BOT_API_KEY = process.env.BOT_API_KEY;
+
+if (!BOT_API_KEY) {
+  console.warn('⚠️  BOT_API_KEY non définie dans le .env ! La vérification ne fonctionnera pas.');
+}
+
+// Middleware
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'build')));
+
+// Headers pour compatibilité Discord Activities (iframe)
+app.use((req, res, next) => {
+    res.removeHeader('X-Frame-Options');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://discord.com https://*.discord.com");
+    next();
+});
+
+// API pour obtenir l'URL OAuth2
+app.get('/api/oauth/url', (req, res) => {
+    console.log('[OAUTH] Requête pour obtenir l\'URL OAuth2');
+    
+    if (!DISCORD_CLIENT_ID) {
+        console.error('[OAUTH] ❌ DISCORD_CLIENT_ID non configuré');
+        return res.status(500).json({ 
+            success: false, 
+            message: 'DISCORD_CLIENT_ID non configuré' 
+        });
+    }
+
+    const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
+    const scope = 'identify guilds guilds.join';
+    const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
+    
+    console.log('[OAUTH] ✅ URL générée:', authUrl);
+    console.log('[OAUTH] Redirect URI:', redirectUri);
+    
+    res.json({ success: true, authUrl });
+});
+
+// Callback Discord OAuth2 (pour les redirections depuis Discord)
+app.get('/auth/callback', async (req, res) => {
+    const { code, error } = req.query;
+
+    if (error) {
+        return res.redirect(`/?error=${encodeURIComponent(error)}`);
+    }
+
+    if (!code) {
+        return res.redirect('/?error=no_code');
+    }
+
+    try {
+        // Échanger le code contre un token d'accès
+        const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                client_id: DISCORD_CLIENT_ID,
+                client_secret: DISCORD_CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: DISCORD_REDIRECT_URI,
+            }),
+        });
+
+        const tokenData = await tokenResponse.json();
+
+        if (!tokenData.access_token) {
+            throw new Error('Impossible d\'obtenir le token d\'accès');
+        }
+
+        // Obtenir les informations utilisateur
+        const userResponse = await fetch('https://discord.com/api/users/@me', {
+            headers: {
+                Authorization: `Bearer ${tokenData.access_token}`,
+            },
+        });
+
+        const userData = await userResponse.json();
+
+        if (!userData.id) {
+            throw new Error('Impossible d\'obtenir les informations utilisateur');
+        }
+
+        // Envoyer la vérification au bot via l'API
+        if (!BOT_API_KEY) {
+            throw new Error('Configuration manquante : BOT_API_KEY non définie');
+        }
+
+        console.log(`[VERIFY] Envoi de la vérification pour ${userData.username}#${userData.discriminator} (${userData.id})`);
+        
+        const botResponse = await fetch(`${BOT_API_URL}/api/verify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': BOT_API_KEY
+            },
+            body: JSON.stringify({
+                userId: userData.id,
+                username: userData.username,
+                discriminator: userData.discriminator,
+                avatar: userData.avatar,
+                guildId: GUILD_ID,
+                accessToken: tokenData.access_token,
+                refreshToken: tokenData.refresh_token,
+                expiresIn: tokenData.expires_in,
+                scope: tokenData.scope
+            })
+        });
+
+        if (!botResponse.ok) {
+            const errorText = await botResponse.text();
+            console.error(`[VERIFY] Erreur HTTP ${botResponse.status}:`, errorText);
+            throw new Error(`Erreur du serveur bot: ${botResponse.status} - ${errorText}`);
+        }
+
+        const botResult = await botResponse.json();
+        console.log('[VERIFY] Réponse du bot:', botResult);
+
+        if (!botResult.success) {
+            throw new Error(botResult.message || 'Erreur lors de la vérification');
+        }
+
+        // Rediriger vers la page de vérification avec succès
+        res.redirect('/verify?success=true');
+
+    } catch (error) {
+        console.error('Erreur de vérification:', error);
+        res.redirect(`/verify?error=${encodeURIComponent(error.message)}`);
+    }
+});
+
+// API de vérification (pour les appels AJAX)
+app.post('/api/verify', async (req, res) => {
+    const { code } = req.body;
+
+    if (!code) {
+        return res.status(400).json({ success: false, message: 'Code manquant' });
+    }
+
+    try {
+        // Échanger le code contre un token d'accès
+        const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                client_id: DISCORD_CLIENT_ID,
+                client_secret: DISCORD_CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: DISCORD_REDIRECT_URI,
+            }),
+        });
+
+        const tokenData = await tokenResponse.json();
+
+        if (!tokenData.access_token) {
+            throw new Error('Impossible d\'obtenir le token d\'accès');
+        }
+
+        // Obtenir les informations utilisateur
+        const userResponse = await fetch('https://discord.com/api/users/@me', {
+            headers: {
+                Authorization: `Bearer ${tokenData.access_token}`,
+            },
+        });
+
+        const userData = await userResponse.json();
+
+        if (!userData.id) {
+            throw new Error('Impossible d\'obtenir les informations utilisateur');
+        }
+
+        // Envoyer la vérification au bot via l'API
+        if (!BOT_API_KEY) {
+            return res.status(500).json({ success: false, message: 'Configuration manquante : BOT_API_KEY non définie' });
+        }
+
+        console.log(`[VERIFY] Envoi de la vérification pour ${userData.username}#${userData.discriminator} (${userData.id})`);
+        
+        const botResponse = await fetch(`${BOT_API_URL}/api/verify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': BOT_API_KEY
+            },
+            body: JSON.stringify({
+                userId: userData.id,
+                username: userData.username,
+                discriminator: userData.discriminator,
+                avatar: userData.avatar,
+                guildId: GUILD_ID,
+                accessToken: tokenData.access_token,
+                refreshToken: tokenData.refresh_token,
+                expiresIn: tokenData.expires_in,
+                scope: tokenData.scope
+            })
+        });
+
+        if (!botResponse.ok) {
+            const errorText = await botResponse.text();
+            console.error(`[VERIFY] Erreur HTTP ${botResponse.status}:`, errorText);
+            return res.status(botResponse.status).json({ 
+                success: false, 
+                message: `Erreur du serveur bot: ${botResponse.status}`,
+                error: errorText 
+            });
+        }
+
+        const botResult = await botResponse.json();
+        console.log('[VERIFY] Réponse du bot:', botResult);
+
+        if (!botResult.success) {
+            return res.status(400).json({ 
+                success: false, 
+                message: botResult.message || 'Erreur lors de la vérification' 
+            });
+        }
+
+        res.json({ success: true, message: 'Vérification réussie', data: botResult });
+
+    } catch (error) {
+        console.error('Erreur de vérification:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+
+// Serve React app for all other routes
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
+// Démarrer le serveur
+app.listen(PORT, () => {
+    console.log(`🚀 Serveur de vérification démarré sur le port ${PORT}`);
+    console.log(`🌐 URL: http://localhost:${PORT}`);
+    console.log(`📋 Configuration requise:`);
+    console.log(`   - DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID ? '✅' : '❌'}`);
+    console.log(`   - DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET ? '✅' : '❌'}`);
+    console.log(`   - GUILD_ID: ${GUILD_ID ? '✅' : '❌'}`);
+    console.log(`   - BOT_API_URL: ${BOT_API_URL ? '✅' : '❌'}`);
+    console.log(`   - BOT_API_KEY: ${BOT_API_KEY ? '✅' : '❌'}`);
+});
+
