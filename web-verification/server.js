@@ -82,7 +82,10 @@ function verifyDiscordSignature(signature, timestamp, body, publicKey) {
     }
 }
 
-// Endpoint Discord Interactions (pour Discord Activities)
+// Endpoint Discord Interactions (UNIQUEMENT pour Discord Activities)
+// IMPORTANT: Cet endpoint ne doit PAS être configuré comme "Interactions Endpoint URL" principal
+// Il doit être uniquement dans "Activity URL Override" pour les Activities
+// Les interactions normales (slash commands, boutons, modals) passent par WebSocket via discord.js
 app.post('/api/interactions', async (req, res) => {
     // Définir les headers de réponse immédiatement
     res.setHeader('Content-Type', 'application/json');
@@ -148,11 +151,12 @@ app.post('/api/interactions', async (req, res) => {
         // Type 2 = APPLICATION_COMMAND (commande slash)
         if (interaction.type === 2) {
             const commandName = interaction.data?.name;
-            console.log('[INTERACTIONS] Commande reçue:', commandName);
+            console.log('[INTERACTIONS] ✅ Commande reçue:', commandName);
             
             // Ne traiter QUE la commande /activity pour les Discord Activities
             // Toutes les autres commandes sont gérées par le bot Discord via WebSocket
             if (commandName === 'activity') {
+                console.log('[INTERACTIONS] ✅ Commande /activity détectée - Traitement de l\'Activity');
                 const gameUrl = `${process.env.WEB_VERIFICATION_URL || 'https://emynona.shop'}/game`;
                 return res.status(200).json({
                     type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
@@ -171,40 +175,47 @@ app.post('/api/interactions', async (req, res) => {
                 });
             }
             
-            // IMPORTANT: Si l'endpoint est configuré comme endpoint principal dans Discord Developer Portal,
-            // Discord enverra TOUTES les interactions ici. Dans ce cas, on doit retourner un ACK immédiat
-            // pour éviter l'erreur "n'a pas répondu à temps", mais le bot ne pourra pas traiter l'interaction
-            // car elle n'arrivera pas via WebSocket.
+            // ⚠️ ATTENTION: Si vous voyez ce message, cela signifie que l'endpoint est mal configuré
             // 
-            // SOLUTION: Ne PAS configurer cet endpoint comme endpoint principal d'interactions.
-            // Il doit être uniquement pour les Activities (Activity URL Override).
-            // Les interactions normales doivent passer par WebSocket via discord.js.
+            // PROBLÈME: Une commande autre que /activity a été reçue sur cet endpoint.
+            // Cela signifie probablement que l'endpoint est configuré comme "Interactions Endpoint URL" principal.
             //
-            // Si vous avez déjà configuré cet endpoint comme principal, vous devez le désactiver dans
-            // Discord Developer Portal > Application > General Information > Interactions Endpoint URL
-            // et utiliser uniquement "Activity URL Override" pour les Activities.
-            console.warn('[INTERACTIONS] ⚠️ Commande non-activity reçue:', commandName);
-            console.warn('[INTERACTIONS] ⚠️ Cet endpoint ne devrait recevoir QUE /activity');
-            console.warn('[INTERACTIONS] ⚠️ Vérifiez que l\'endpoint n\'est PAS configuré comme endpoint principal');
-            console.warn('[INTERACTIONS] ⚠️ Il doit être uniquement dans "Activity URL Override"');
+            // SOLUTION REQUISE:
+            // 1. Allez dans Discord Developer Portal > Application > General Information
+            // 2. Supprimez ou désactivez "Interactions Endpoint URL" (doit être VIDE)
+            // 3. Allez dans "Activities" et configurez "Activity URL Override" avec cette URL
+            // 4. Cochez "Utiliser la dérogation d'URL d'Activité"
+            //
+            // RÉSULTAT ATTENDU:
+            // - Les commandes normales (/help, /verify, etc.) passeront par WebSocket (discord.js)
+            // - Seule la commande /activity passera par cet endpoint HTTP
+            //
+            console.error('[INTERACTIONS] ❌ ERREUR DE CONFIGURATION DÉTECTÉE');
+            console.error('[INTERACTIONS] ❌ Commande non-activity reçue:', commandName);
+            console.error('[INTERACTIONS] ❌ Cet endpoint ne devrait recevoir QUE /activity');
+            console.error('[INTERACTIONS] ❌ L\'endpoint est probablement configuré comme endpoint principal');
+            console.error('[INTERACTIONS] ❌ Consultez DISCORD_INTERACTIONS_SETUP.md pour la configuration correcte');
             
             // Retourner un ACK pour éviter l'erreur "n'a pas répondu à temps"
-            // Mais l'interaction ne sera PAS traitée par le bot si l'endpoint est configuré comme principal
-            return res.status(200).json({ type: 1 }); // ACK immédiat
+            // MAIS: L'interaction ne sera PAS traitée par le bot si l'endpoint est configuré comme principal
+            // La commande ne fonctionnera pas correctement jusqu'à ce que la configuration soit corrigée
+            return res.status(200).json({ type: 1 }); // ACK immédiat (évite timeout)
         }
         
         // Type 3 = MESSAGE_COMPONENT (boutons, menus)
         // Ces interactions sont gérées par le bot Discord via WebSocket, pas par cet endpoint
         if (interaction.type === 3) {
-            console.warn('[INTERACTIONS] ⚠️ Composant reçu (ne devrait pas arriver ici):', interaction.data?.custom_id);
-            return res.status(200).json({ type: 1 }); // ACK immédiat
+            console.error('[INTERACTIONS] ❌ Composant reçu (ne devrait PAS arriver ici):', interaction.data?.custom_id);
+            console.error('[INTERACTIONS] ❌ Vérifiez la configuration dans Discord Developer Portal');
+            return res.status(200).json({ type: 1 }); // ACK immédiat (évite timeout)
         }
         
         // Type 5 = MODAL_SUBMIT
         // Ces interactions sont gérées par le bot Discord via WebSocket, pas par cet endpoint
         if (interaction.type === 5) {
-            console.warn('[INTERACTIONS] ⚠️ Modal soumis (ne devrait pas arriver ici):', interaction.data?.custom_id);
-            return res.status(200).json({ type: 1 }); // ACK immédiat
+            console.error('[INTERACTIONS] ❌ Modal soumis (ne devrait PAS arriver ici):', interaction.data?.custom_id);
+            console.error('[INTERACTIONS] ❌ Vérifiez la configuration dans Discord Developer Portal');
+            return res.status(200).json({ type: 1 }); // ACK immédiat (évite timeout)
         }
         
         // Réponse par défaut (ACK)
@@ -220,6 +231,7 @@ app.post('/api/interactions', async (req, res) => {
 
 // Endpoint de vérification Discord (GET pour la vérification initiale)
 // Note: Discord utilise principalement POST, mais on garde GET pour les tests
+// Endpoint GET pour vérification (Discord peut faire des requêtes GET pour vérifier l'endpoint)
 app.get('/api/interactions', (req, res) => {
     console.log('[INTERACTIONS] Requête GET de vérification reçue');
     res.json({ status: 'ok', message: 'Interactions endpoint is active' });
