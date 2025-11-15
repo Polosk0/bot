@@ -20,6 +20,9 @@ if (!BOT_API_KEY) {
   console.warn('⚠️  BOT_API_KEY non définie dans le .env ! La vérification ne fonctionnera pas.');
 }
 
+// Middleware pour les interactions Discord (doit être avant express.json)
+app.use('/api/interactions', express.raw({ type: 'application/json' }));
+
 // Middleware
 app.use(express.json());
 
@@ -31,6 +34,92 @@ app.use((req, res, next) => {
     res.removeHeader('X-Frame-Options');
     res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://discord.com https://*.discord.com");
     next();
+});
+
+// Endpoint Discord Interactions (pour Discord Activities)
+app.post('/api/interactions', async (req, res) => {
+    try {
+        const signature = req.headers['x-signature-ed25519'];
+        const timestamp = req.headers['x-signature-timestamp'];
+        
+        // Pour la vérification initiale, Discord peut envoyer sans signature
+        if (!signature || !timestamp) {
+            console.log('[INTERACTIONS] Requête de vérification (sans signature)');
+            // Si c'est un PING, on répond quand même
+            try {
+                const body = req.body.toString();
+                const interaction = JSON.parse(body);
+                if (interaction.type === 1) {
+                    return res.json({ type: 1 });
+                }
+            } catch (e) {
+                // Ignorer l'erreur de parsing
+            }
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const body = req.body.toString();
+        const interaction = JSON.parse(body);
+        
+        console.log('[INTERACTIONS] Interaction reçue:', {
+            type: interaction.type,
+            name: interaction.data?.name,
+            custom_id: interaction.data?.custom_id
+        });
+        
+        // Type 1 = PING (vérification)
+        if (interaction.type === 1) {
+            console.log('[INTERACTIONS] PING reçu, renvoi PONG');
+            return res.json({ type: 1 });
+        }
+        
+        // Type 2 = APPLICATION_COMMAND (commande slash)
+        if (interaction.type === 2) {
+            console.log('[INTERACTIONS] Commande reçue:', interaction.data?.name);
+            // Pour les Discord Activities, on peut simplement rediriger vers la page de vérification
+            return res.json({
+                type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+                data: {
+                    content: '🔗 Redirection vers la page de vérification...',
+                    components: [{
+                        type: 1, // ACTION_ROW
+                        components: [{
+                            type: 2, // BUTTON
+                            style: 5, // LINK
+                            label: '🚀 Se Vérifier',
+                            url: `${process.env.WEB_VERIFICATION_URL || 'https://emynona.shop'}/verify`
+                        }]
+                    }]
+                }
+            });
+        }
+        
+        // Type 3 = MESSAGE_COMPONENT (boutons, menus)
+        if (interaction.type === 3) {
+            console.log('[INTERACTIONS] Composant reçu:', interaction.data?.custom_id);
+            return res.json({ type: 1 }); // ACK
+        }
+        
+        // Type 5 = MODAL_SUBMIT
+        if (interaction.type === 5) {
+            console.log('[INTERACTIONS] Modal soumis:', interaction.data?.custom_id);
+            return res.json({ type: 1 }); // ACK
+        }
+        
+        // Réponse par défaut
+        return res.json({ type: 1 });
+        
+    } catch (error) {
+        console.error('[INTERACTIONS] Erreur:', error);
+        return res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Endpoint de vérification Discord (GET pour la vérification initiale)
+app.get('/api/interactions', (req, res) => {
+    // Discord peut envoyer une requête GET pour vérifier l'endpoint
+    console.log('[INTERACTIONS] Requête GET de vérification reçue');
+    res.json({ status: 'ok', message: 'Interactions endpoint is active' });
 });
 
 // API pour obtenir l'URL OAuth2
