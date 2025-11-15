@@ -201,7 +201,7 @@ export const verify: Command = {
                         iconURL: interaction.guild.iconURL() || undefined
                     });
 
-                const verificationUrl = `${process.env.WEB_VERIFICATION_URL || 'http://localhost:3000'}/verify`;
+                const verificationUrl = `${process.env.WEB_VERIFICATION_URL || 'http://93.127.160.64:3000'}/verify`;
                 
                 const verifyButton = new ButtonBuilder()
                     .setLabel('🚀 Se Vérifier')

@@ -9,11 +9,11 @@ const PORT = process.env.PORT || 3000;
 // Configuration Discord
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'http://localhost:3000/auth/callback';
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'http://93.127.160.64:3000/auth/callback';
 const GUILD_ID = process.env.GUILD_ID;
 
 // Configuration Bot API
-const BOT_API_URL = process.env.BOT_API_URL || 'http://localhost:3001';
+const BOT_API_URL = process.env.BOT_API_URL || 'http://93.127.160.64:3001';
 const BOT_API_KEY = process.env.BOT_API_KEY;
 
 if (!BOT_API_KEY) {
@@ -254,7 +254,7 @@ app.get('*', (req, res) => {
 // Démarrer le serveur
 app.listen(PORT, () => {
     console.log(`🚀 Serveur de vérification démarré sur le port ${PORT}`);
-    console.log(`🌐 URL: http://localhost:${PORT}`);
+    console.log(`🌐 URL: http://93.127.160.64:${PORT}`);
     console.log(`📋 Configuration requise:`);
     console.log(`   - DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID ? '✅' : '❌'}`);
     console.log(`   - DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET ? '✅' : '❌'}`);
