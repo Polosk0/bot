@@ -22,8 +22,9 @@ if (!BOT_API_KEY) {
 
 // Middleware
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(__dirname));
+
+// Servir les fichiers statiques depuis le dossier build (application React compilée)
+app.use(express.static(path.join(__dirname, 'build')));
 
 // Headers pour compatibilité Discord Activities (iframe)
 app.use((req, res, next) => {
@@ -249,7 +250,7 @@ app.post('/api/verify', async (req, res) => {
 
 // Serve React app for all other routes
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
 // Démarrer le serveur
