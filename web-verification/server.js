@@ -44,7 +44,7 @@ app.get('/api/oauth/url', (req, res) => {
         });
     }
 
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
+    const redirectUri = DISCORD_REDIRECT_URI || `${req.protocol}://93.127.160.64:${PORT}/auth/callback`;
     const scope = 'identify guilds guilds.join';
     const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
     
