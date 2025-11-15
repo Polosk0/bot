@@ -132,7 +132,7 @@ export class LogManager {
     const user = await LogManager.client.users.fetch(logData.userId).catch(() => null);
     const moderator = logData.moderatorId ? await LogManager.client.users.fetch(logData.moderatorId).catch(() => null) : null;
     
-    const downloadUrl = `${process.env.BOT_API_URL || 'https://emynona.shop'}/api/logs/download/${logFileName}`;
+    const downloadUrl = `${process.env.WEB_VERIFICATION_URL || 'https://emynona.shop'}/api/logs/download/${logFileName}`;
     const downloadButton = new ButtonBuilder()
       .setLabel('📥 Télécharger le log')
       .setStyle(ButtonStyle.Link)
