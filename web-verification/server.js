@@ -93,16 +93,6 @@ app.post('/api/interactions', async (req, res) => {
             console.log('[INTERACTIONS] Signature présente (non vérifiée pour l\'instant)');
         }
         
-        // Vérification de la signature (optionnelle pour la vérification initiale)
-        const signature = req.headers['x-signature-ed25519'];
-        const timestamp = req.headers['x-signature-timestamp'];
-        
-        // Pour les interactions réelles (pas PING), on devrait vérifier la signature
-        // Mais pour l'instant, on accepte tout pour que la vérification Discord fonctionne
-        if (signature && timestamp) {
-            console.log('[INTERACTIONS] Signature présente (non vérifiée pour l\'instant)');
-        }
-        
         // Type 2 = APPLICATION_COMMAND (commande slash)
         if (interaction.type === 2) {
             console.log('[INTERACTIONS] Commande reçue:', interaction.data?.name);
