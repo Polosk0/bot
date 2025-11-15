@@ -563,7 +563,7 @@ async function handleVerificationHelp(interaction: ButtonInteraction) {
         name: '📋 Étapes détaillées', 
         value: 
           '**Étape 1 :** Cliquez sur le bouton "Se Vérifier"\n' +
-          `**Étape 2 :** Vous serez redirigé vers ${process.env.WEB_VERIFICATION_URL || 'http://93.127.160.64:3000'}/verify\n` +
+          `**Étape 2 :** Vous serez redirigé vers ${process.env.WEB_VERIFICATION_URL || 'https://emynona.shop'}/verify\n` +
           '**Étape 3 :** Connectez-vous avec votre compte Discord\n' +
           '**Étape 4 :** Complétez le processus de vérification\n' +
           '**Étape 5 :** Attendez la validation (quelques secondes)\n' +
@@ -616,7 +616,7 @@ async function handleVerificationHelp(interaction: ButtonInteraction) {
 
 async function handleOpenWebsite(interaction: ButtonInteraction) {
   await interaction.reply({
-    content: `🌐 Redirection vers ${process.env.WEB_VERIFICATION_URL || 'http://93.127.160.64:3000'}/verify`,
+    content: `🌐 Redirection vers ${process.env.WEB_VERIFICATION_URL || 'https://emynona.shop'}/verify`,
     flags: MessageFlags.Ephemeral
   });
 }

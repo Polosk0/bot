@@ -317,7 +317,7 @@ export class HttpServer {
     const server = this.app.listen(port, () => {
       this.port = port;
       logger.info(`🌐 Serveur HTTP démarré sur le port ${this.port}`);
-      const serverUrl = process.env.WEB_VERIFICATION_URL?.replace(':3000', `:${this.port}`) || `http://93.127.160.64:${this.port}`;
+      const serverUrl = process.env.WEB_VERIFICATION_URL || 'https://emynona.shop';
       logger.info(`📡 Webhook de vérification: ${serverUrl}/api/verify`);
     });
 

@@ -8,7 +8,7 @@ import { Command } from '../../types/command';
 import { logger } from '../../utils/logger';
 import axios from 'axios';
 
-const ACTIVITY_URL = process.env.ACTIVITY_URL || process.env.WEB_VERIFICATION_URL || 'http://93.127.160.64:3000';
+const ACTIVITY_URL = process.env.ACTIVITY_URL || process.env.WEB_VERIFICATION_URL || 'https://emynona.shop';
 
 export const activity: Command = {
     data: new SlashCommandBuilder()

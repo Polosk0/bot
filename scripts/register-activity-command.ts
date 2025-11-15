@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const APPLICATION_ID = process.env.DISCORD_CLIENT_ID || process.env.APPLICATION_ID;
-const ACTIVITY_URL = process.env.ACTIVITY_URL || process.env.WEB_VERIFICATION_URL || 'http://localhost:3000';
+const ACTIVITY_URL = process.env.ACTIVITY_URL || process.env.WEB_VERIFICATION_URL || 'https://emynona.shop';
 
 if (!DISCORD_TOKEN) {
     console.error('❌ DISCORD_TOKEN manquant dans le .env');

@@ -49,7 +49,7 @@ export const guide: Command = {
                 .setTitle('🎯 €MYNONA MARKET - GUIDE RAPIDE')
                 .setDescription('**🌟 Votre serveur Discord de confiance !**\nGuide complet pour bien commencer et profiter de tous nos services premium.')
                 .setColor(0xffa500)
-                .setURL('http://93.127.160.64:3000/')
+                .setURL('https://emynona.shop/')
                 .setImage('https://images-ext-1.discordapp.net/external/yZHm3JctPlyNjLaWa1ONa_d4vrRuFAdgqF1f7Izt6sU/https/image.noelshack.com/fichiers/2025/43/1/1760983798-guide-discorda.png?format=webp&quality=lossless')
                 .setThumbnail('https://images-ext-1.discordapp.net/external/bnDqCDeDkLi3XRWqtPsuRDOun7XEjBye5Uq0LGnNbKY/https/image.noelshack.com/fichiers/2025/43/1/1760982022-3dgifmaker09929.gif')
                 .addFields(
