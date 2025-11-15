@@ -360,7 +360,7 @@ export const help: Command = {
                                 `*Sélectionnez une option ci-dessous pour obtenir de l'assistance*`
                             )
                             .setColor(0x0099ff)
-                            .addFields(
+                .addFields(
                                 {
                                     name: '🎫 Système de Tickets',
                                     value: `Créer un ticket de support\nUtilisez \`/ticket\` pour ouvrir un ticket et obtenir de l'aide personnalisée\n\nRéponse sous 24h garantie`,
@@ -381,7 +381,7 @@ export const help: Command = {
                                 text: '€mynona Market • Support client',
                                 iconURL: 'https://cdn.discordapp.com/emojis/1234567890123456789.png'
                             })
-                            .setTimestamp();
+                .setTimestamp();
 
                         await buttonInteraction.update({
                             embeds: [supportEmbed],
