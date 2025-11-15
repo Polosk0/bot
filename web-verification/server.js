@@ -28,15 +28,40 @@ app.use('/api/interactions', express.raw({ type: 'application/json' }));
 // Middleware
 app.use(express.json());
 
-// Servir les fichiers statiques depuis le dossier build (application React compilée)
-app.use(express.static(path.join(__dirname, 'build')));
-
-// Headers pour compatibilité Discord Activities (iframe)
+// Headers pour compatibilité Discord Activities (iframe) - DOIT être avant static
 app.use((req, res, next) => {
+    // Supprimer X-Frame-Options si présent (obsolète mais certains serveurs l'ajoutent)
     res.removeHeader('X-Frame-Options');
-    res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://discord.com https://*.discord.com");
+    
+    // Configurer CSP pour autoriser Discord iframe (MÉTHODE MODERNE ET RECOMMANDÉE)
+    // Note: frame-ancestors remplace X-Frame-Options dans les navigateurs modernes
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://discord.com https://*.discord.com https://discordapp.com https://*.discordapp.com;");
+    
+    // Headers CORS pour Discord
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Signature-Ed25519, X-Signature-Timestamp, Accept, Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    // Headers supplémentaires pour Discord
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    
+    // Gérer les requêtes OPTIONS (preflight)
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
     next();
 });
+
+// Servir les fichiers statiques depuis le dossier build (application React compilée)
+app.use(express.static(path.join(__dirname, 'build'), {
+    setHeaders: (res, path) => {
+        // S'assurer que les fichiers statiques ont aussi les bons headers
+        res.removeHeader('X-Frame-Options');
+        res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://discord.com https://*.discord.com https://discordapp.com https://*.discordapp.com");
+    }
+}));
 
 // Fonction pour vérifier la signature Discord
 function verifyDiscordSignature(signature, timestamp, body, publicKey) {
@@ -122,35 +147,48 @@ app.post('/api/interactions', async (req, res) => {
         
         // Type 2 = APPLICATION_COMMAND (commande slash)
         if (interaction.type === 2) {
-            console.log('[INTERACTIONS] Commande reçue:', interaction.data?.name);
-            // Pour les Discord Activities, on peut simplement rediriger vers la page de vérification
-            return res.status(200).json({
-                type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
-                data: {
-                    content: '🔗 Redirection vers la page de vérification...',
-                    components: [{
-                        type: 1, // ACTION_ROW
+            const commandName = interaction.data?.name;
+            console.log('[INTERACTIONS] Commande reçue:', commandName);
+            
+            // Ne traiter QUE la commande /activity pour les Discord Activities
+            // Toutes les autres commandes sont gérées par le bot Discord via WebSocket
+            if (commandName === 'activity') {
+                const gameUrl = `${process.env.WEB_VERIFICATION_URL || 'https://emynona.shop'}/game`;
+                return res.status(200).json({
+                    type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+                    data: {
+                        content: '🎰 Lancement de la Roue de la Fortune !',
                         components: [{
-                            type: 2, // BUTTON
-                            style: 5, // LINK
-                            label: '🚀 Se Vérifier',
-                            url: `${process.env.WEB_VERIFICATION_URL || 'https://emynona.shop'}/verify`
+                            type: 1, // ACTION_ROW
+                            components: [{
+                                type: 2, // BUTTON
+                                style: 5, // LINK
+                                label: '🎲 Jouer Maintenant',
+                                url: gameUrl
+                            }]
                         }]
-                    }]
-                }
-            });
+                    }
+                });
+            }
+            
+            // Pour toutes les autres commandes, ne rien faire
+            // Elles sont gérées par le bot Discord normalement via WebSocket
+            console.log('[INTERACTIONS] Commande non-activity ignorée (gérée par le bot):', commandName);
+            return res.status(200).json({ type: 1 }); // ACK silencieux
         }
         
         // Type 3 = MESSAGE_COMPONENT (boutons, menus)
+        // Ces interactions sont gérées par le bot Discord via WebSocket, pas par cet endpoint
         if (interaction.type === 3) {
-            console.log('[INTERACTIONS] Composant reçu:', interaction.data?.custom_id);
-            return res.status(200).json({ type: 1 }); // ACK
+            console.log('[INTERACTIONS] Composant reçu (ignoré, géré par le bot):', interaction.data?.custom_id);
+            return res.status(200).json({ type: 1 }); // ACK silencieux
         }
         
         // Type 5 = MODAL_SUBMIT
+        // Ces interactions sont gérées par le bot Discord via WebSocket, pas par cet endpoint
         if (interaction.type === 5) {
-            console.log('[INTERACTIONS] Modal soumis:', interaction.data?.custom_id);
-            return res.status(200).json({ type: 1 }); // ACK
+            console.log('[INTERACTIONS] Modal soumis (ignoré, géré par le bot):', interaction.data?.custom_id);
+            return res.status(200).json({ type: 1 }); // ACK silencieux
         }
         
         // Réponse par défaut (ACK)
@@ -385,6 +423,37 @@ app.post('/api/verify', async (req, res) => {
     }
 });
 
+
+// API pour sauvegarder les récompenses gagnées
+app.post('/api/rewards/claim', async (req, res) => {
+    try {
+        const { userId, rewardId, rewardName } = req.body;
+        
+        if (!userId || !rewardId || !rewardName) {
+            return res.status(400).json({ success: false, message: 'Données manquantes' });
+        }
+
+        console.log(`[REWARDS] Récompense réclamée: ${rewardName} (${rewardId}) par utilisateur ${userId}`);
+        
+        // Ici, vous pouvez sauvegarder la récompense dans une base de données
+        // Pour l'instant, on log juste
+        // TODO: Implémenter la sauvegarde dans la base de données
+        
+        res.json({ 
+            success: true, 
+            message: 'Récompense enregistrée',
+            reward: {
+                id: rewardId,
+                name: rewardName,
+                userId: userId,
+                claimedAt: new Date().toISOString()
+            }
+        });
+    } catch (error) {
+        console.error('[REWARDS] Erreur:', error);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+});
 
 // Serve React app for all other routes
 app.get('*', (req, res) => {
