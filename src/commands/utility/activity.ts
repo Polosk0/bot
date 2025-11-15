@@ -36,7 +36,7 @@ export const activity: Command = {
                     .setDescription(`Cliquez sur le lien ci-dessous pour accéder à la page de vérification :`)
                     .addFields({
                         name: '🌐 URL',
-                        value: `[${ACTIVITY_URL}](${ACTIVITY_URL})`
+                        value: `[${ACTIVITY_URL}/verify](${ACTIVITY_URL}/verify)`
                     })
                     .setColor('#5865F2')
                     .setFooter({ text: '€mynona Market • Système de vérification' })
@@ -87,7 +87,7 @@ export const activity: Command = {
                         .setDescription(`Accédez à la page de vérification pour compléter votre profil :`)
                         .addFields({
                             name: '🔗 URL',
-                            value: `[${ACTIVITY_URL}](${ACTIVITY_URL})`
+                            value: `[${ACTIVITY_URL}/verify](${ACTIVITY_URL}/verify)`
                         })
                         .setColor('#5865F2')
                         .setFooter({ text: '€mynona Market • Système de vérification' })

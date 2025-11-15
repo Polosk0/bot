@@ -91,7 +91,7 @@ async function handleSingleReinvite(interaction: ChatInputCommandInteraction): P
                 .setDescription(`${targetUser} n'a pas autorisé la réinvitation automatique.`)
                 .addFields({
                     name: '💡 Solution',
-                    value: 'Demandez-lui de se reconnecter via la page de vérification pour enregistrer une autorisation.'
+                    value: `Demandez-lui de se reconnecter via la page de vérification (${process.env.WEB_VERIFICATION_URL || 'https://emynona.shop'}/verify) pour enregistrer une autorisation.`
                 })
                 .setColor('#ff0000')
                 .setTimestamp();
@@ -285,13 +285,16 @@ async function notifyUserReinvited(userId: string, guild: Guild, client: Client)
     if (!user) {
         return;
     }
+    const verificationUrl = `${process.env.WEB_VERIFICATION_URL || 'https://emynona.shop'}/verify`;
     const content = [
         `Salut ${user.username},`,
         '',
         `Nous venons de te réinviter automatiquement sur **${guild.name}** suite à une restauration du serveur.`,
         `Tu n'as rien à faire : tu peux rejoindre directement depuis Discord.`,
         '',
-        `Si tu souhaites retirer cette autorisation, va dans **Paramètres utilisateur > Applications autorisées** et révoque l'accès de notre service.`
+        `Si tu souhaites retirer cette autorisation, va dans **Paramètres utilisateur > Applications autorisées** et révoque l'accès de notre service.`,
+        '',
+        `Page de vérification : ${verificationUrl}`
     ].join('\n');
     await user.send(content).catch(() => {});
 }
