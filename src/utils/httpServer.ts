@@ -314,14 +314,18 @@ export class HttpServer {
         const userId = req.query.userId as string;
         
         if (!userId) {
+          logger.warn('[BALANCE] userId manquant dans la requête');
           return res.status(400).json({ 
             success: false, 
             message: 'userId est requis' 
           });
         }
 
+        logger.info(`[BALANCE] Récupération du solde pour userId: ${userId}`);
         const balance = CurrencyManager.getBalance(userId);
         const totalInvites = await CurrencyManager.getTotalInvites(userId);
+        
+        logger.info(`[BALANCE] Solde récupéré: ${balance} coins pour ${userId}`);
         
         res.json({ 
           success: true, 

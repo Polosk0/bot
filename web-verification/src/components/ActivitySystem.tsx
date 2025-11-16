@@ -29,9 +29,20 @@ const ActivitySystem: React.FC = () => {
     if (action && (action === 'crate' || action === 'wheel')) {
       setCurrentAction(action);
     }
-
-    fetchBalance();
   }, []);
+
+  useEffect(() => {
+    if (userId) {
+      fetchBalance();
+    } else {
+      const storedId = localStorage.getItem('discord_user_id');
+      if (storedId) {
+        setUserId(storedId);
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [userId]);
 
   const fetchBalance = async () => {
     try {
@@ -41,10 +52,17 @@ const ActivitySystem: React.FC = () => {
         return;
       }
 
+      console.log('[BALANCE] Récupération du solde pour userId:', id);
       const response = await fetch(`/api/currency/balance?userId=${id}`);
+      console.log('[BALANCE] Réponse:', response.status, response.statusText);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('[BALANCE] Données reçues:', data);
         setBalance(data.balance || 0);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[BALANCE] Erreur:', errorData);
       }
     } catch (error) {
       console.error('Erreur lors de la récupération du solde:', error);
