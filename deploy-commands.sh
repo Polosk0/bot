@@ -36,7 +36,7 @@ sleep 5
 
 # Vérifier les logs
 echo "📋 Vérification des logs de synchronisation..."
-pm2 logs discord-bot --lines 100 | grep -E "Synchronisation|synchronisées|Commandes:|balance|rewards|add-coins|sync-commands" | tail -20
+timeout 5 pm2 logs discord-bot --lines 100 --nostream 2>/dev/null | grep -E "Synchronisation|synchronisées|Commandes:|balance|rewards|add-coins|sync-commands" | tail -20 || echo "⚠️  Impossible de récupérer les logs (normal si le bot vient de démarrer)"
 
 echo ""
 echo "✅ Déploiement terminé!"
