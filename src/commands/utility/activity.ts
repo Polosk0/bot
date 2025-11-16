@@ -88,10 +88,31 @@ export const activity: Command = {
             }
 
             try {
-                const inviteCode = await createActivityInvite(interaction.guild.id, applicationId);
+                // Générer un token de session pour cette activité
+                const sessionToken = `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                // Stocker le userId dans le cache côté serveur web-verification
+                try {
+                    const webVerificationUrl = process.env.WEB_VERIFICATION_URL || ACTIVITY_URL;
+                    await fetch(`${webVerificationUrl}/api/activity/store-token`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            token: sessionToken,
+                            userId: interaction.user.id 
+                        })
+                    }).catch((error) => {
+                        logger.warn('Impossible de stocker le token dans web-verification:', error);
+                    });
+                } catch (error) {
+                    logger.warn('Erreur lors du stockage du token:', error);
+                }
                 
                 const actionType = action || 'crate';
-                const gameUrl = `${ACTIVITY_URL}/activity?action=${actionType}&userId=${interaction.user.id}`;
+                // Passer à la fois le token ET le userId dans l'URL pour double sécurité
+                const gameUrl = `${ACTIVITY_URL}/activity?action=${actionType}&token=${sessionToken}&userId=${interaction.user.id}`;
                 
                 const embed = new EmbedBuilder()
                     .setTitle('🎰 Système €mynona Coins')

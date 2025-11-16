@@ -641,34 +641,69 @@ app.post('/api/discord/verify-token', async (req, res) => {
     }
 });
 
+// API pour stocker un token de session d'activité (appelé par le bot Discord)
+app.post('/api/activity/store-token', async (req, res) => {
+    try {
+        const { token, userId } = req.body;
+        
+        if (!token || !userId) {
+            return res.status(400).json({ success: false, message: 'token et userId sont requis' });
+        }
+        
+        // Stocker le token dans le cache
+        activityUserCache.set(token, {
+            userId: userId,
+            expiresAt: Date.now() + CACHE_EXPIRY,
+            createdAt: new Date()
+        });
+        
+        console.log('[ACTIVITY TOKEN] ✅ Token stocké dans le cache:', token, 'pour userId:', userId);
+        res.json({ success: true, message: 'Token stocké' });
+    } catch (error) {
+        console.error('[ACTIVITY TOKEN] Erreur:', error);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+});
+
 // API pour obtenir le userId depuis Discord (pour les iframes)
 app.get('/api/discord/user-id', async (req, res) => {
     try {
+        console.log('[DISCORD] Requête pour récupérer userId - Query:', req.query);
         console.log('[DISCORD] Requête pour récupérer userId - Headers:', {
             'x-discord-user-id': req.headers['x-discord-user-id'],
             'x-user-id': req.headers['x-user-id'],
-            'user-agent': req.headers['user-agent'],
-            'referer': req.headers['referer']
+            'user-agent': req.headers['user-agent']?.substring(0, 50),
+            'referer': req.headers['referer']?.substring(0, 100)
         });
         
-        // Méthode 1: Récupérer depuis le token de session (pour les activités Discord)
+        // Méthode 1: Récupérer depuis le token de session (pour les activités Discord lancées via /activity)
         const token = req.query.token;
         if (token) {
             const cached = activityUserCache.get(token);
             if (cached && Date.now() < cached.expiresAt) {
-                console.log('[DISCORD] ✅ userId récupéré depuis le cache:', cached.userId);
+                console.log('[DISCORD] ✅ userId récupéré depuis le cache (token):', cached.userId);
                 return res.json({ success: true, userId: cached.userId });
             } else if (cached) {
                 // Token expiré, le supprimer
                 activityUserCache.delete(token);
                 console.warn('[DISCORD] Token expiré:', token);
+            } else {
+                console.warn('[DISCORD] Token non trouvé dans le cache:', token);
             }
         }
         
-        // Méthode 2: Vérifier les query params
+        // Méthode 2: Vérifier les query params (priorité haute car c'est le plus fiable)
         const queryUserId = req.query.user_id || req.query.userId;
         if (queryUserId) {
             console.log('[DISCORD] ✅ userId récupéré depuis query params:', queryUserId);
+            // Si on a un token aussi, le stocker dans le cache pour les prochaines requêtes
+            if (token) {
+                activityUserCache.set(token, {
+                    userId: queryUserId,
+                    expiresAt: Date.now() + CACHE_EXPIRY,
+                    createdAt: new Date()
+                });
+            }
             return res.json({ success: true, userId: queryUserId });
         }
         

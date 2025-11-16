@@ -276,10 +276,45 @@ export class HttpServer {
           'GET /api/logs/download/:filename': 'Télécharger un fichier de log (pas de clé API requise)',
           'GET /api/currency/balance': 'Obtenir le solde d\'un utilisateur (pas de clé API requise)',
           'POST /api/currency/spend': 'Dépenser des coins (clé API requise)',
-          'POST /api/rewards/claim': 'Enregistrer une récompense (clé API requise)'
+          'POST /api/rewards/claim': 'Enregistrer une récompense (clé API requise)',
+          'POST /api/activity/token': 'Créer un token de session pour une activité (clé API requise)'
         },
         note: 'Pour utiliser /api/verify, envoyez la clé API via le header "x-api-key" ou le paramètre "apiKey"'
       });
+    });
+
+    // Endpoint pour créer un token de session d'activité (appelé par web-verification/server.js)
+    this.app.post('/api/activity/token', async (req: Request, res: Response) => {
+      try {
+        const { userId } = req.body;
+        
+        if (!userId) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'userId est requis' 
+          });
+        }
+
+        // Générer un token unique
+        const sessionToken = `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Le token sera stocké dans le cache de web-verification/server.js
+        // On retourne juste le token, web-verification le stockera
+        
+        logger.info(`[ACTIVITY TOKEN] Token généré pour userId: ${userId}, token: ${sessionToken}`);
+        
+        res.json({ 
+          success: true, 
+          token: sessionToken,
+          userId: userId
+        });
+      } catch (error) {
+        logger.error('[ACTIVITY TOKEN] Erreur:', error);
+        res.status(500).json({ 
+          success: false, 
+          message: 'Erreur serveur' 
+        });
+      }
     });
 
     this.app.get('/api/logs/download/:filename', (req: Request, res: Response) => {

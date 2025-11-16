@@ -479,10 +479,32 @@ const ActivitySystem: React.FC = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const discordUserId = urlParams.get('user_id') || urlParams.get('userId') || urlParams.get('discord_user_id');
       if (discordUserId) {
-        console.log('[DISCORD] userId trouvé dans URL:', discordUserId);
+        console.log('[DISCORD] ✅ userId trouvé dans URL:', discordUserId);
         localStorage.setItem('discord_user_id', discordUserId);
         resolve(discordUserId);
         return;
+      }
+      
+      // Méthode 2b: Vérifier aussi dans l'URL complète (Discord peut passer l'info dans le hash ou autre)
+      const fullUrl = window.location.href;
+      const urlMatch = fullUrl.match(/[?&](?:user_id|userId|discord_user_id)=([^&]+)/);
+      if (urlMatch && urlMatch[1]) {
+        console.log('[DISCORD] ✅ userId trouvé dans URL complète:', urlMatch[1]);
+        localStorage.setItem('discord_user_id', urlMatch[1]);
+        resolve(urlMatch[1]);
+        return;
+      }
+      
+      // Méthode 2c: Vérifier dans le hash de l'URL
+      if (window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const hashUserId = hashParams.get('user_id') || hashParams.get('userId');
+        if (hashUserId) {
+          console.log('[DISCORD] ✅ userId trouvé dans hash URL:', hashUserId);
+          localStorage.setItem('discord_user_id', hashUserId);
+          resolve(hashUserId);
+          return;
+        }
       }
 
       // Méthode 3: Récupérer depuis le token de session (activité Discord lancée via /activity)
