@@ -9,7 +9,8 @@
     "dev": "ts-node src/index.ts",
     "watch": "ts-node --watch src/index.ts",
     "generate-api-key": "node scripts/generate-api-key.js",
-    "register-activity": "ts-node scripts/register-activity-command.ts"
+    "register-activity": "ts-node scripts/register-activity-command.ts",
+    "set-infinite-coins": "ts-node scripts/set-infinite-coins.ts"
   },
   "keywords": [
     "discord",

@@ -255,5 +255,34 @@ export class CurrencyManager {
   static getTransactionHistory(userId: string, limit: number = 50): CurrencyTransaction[] {
     return CurrencyManager.databaseManager.getCurrencyTransactionsByUser(userId).slice(0, limit);
   }
+
+  static setBalance(userId: string, amount: number, reason: string, metadata?: any): boolean {
+    const user = CurrencyManager.databaseManager.getUser(userId);
+    if (!user) {
+      logger.warn(`Utilisateur ${userId} non trouvé lors de la définition du solde`);
+      return false;
+    }
+
+    const oldBalance = user.emynonaCoins || 0;
+    
+    CurrencyManager.databaseManager.updateUser(userId, {
+      emynonaCoins: amount
+    });
+
+    const transaction: CurrencyTransaction = {
+      id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      userId,
+      type: amount > oldBalance ? 'earn' : 'spend',
+      amount: amount - oldBalance,
+      reason,
+      metadata,
+      createdAt: new Date()
+    };
+
+    CurrencyManager.databaseManager.addCurrencyTransaction(transaction);
+    logger.info(`Solde défini à ${amount} coins pour ${userId}. Ancien solde: ${oldBalance}. Raison: ${reason}`);
+    
+    return true;
+  }
 }
 
