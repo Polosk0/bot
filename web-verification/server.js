@@ -644,12 +644,19 @@ app.post('/api/discord/verify-token', async (req, res) => {
 // API pour obtenir le userId depuis Discord (pour les iframes)
 app.get('/api/discord/user-id', async (req, res) => {
     try {
+        console.log('[DISCORD] Requête pour récupérer userId - Headers:', {
+            'x-discord-user-id': req.headers['x-discord-user-id'],
+            'x-user-id': req.headers['x-user-id'],
+            'user-agent': req.headers['user-agent'],
+            'referer': req.headers['referer']
+        });
+        
         // Méthode 1: Récupérer depuis le token de session (pour les activités Discord)
         const token = req.query.token;
         if (token) {
             const cached = activityUserCache.get(token);
             if (cached && Date.now() < cached.expiresAt) {
-                console.log('[DISCORD] userId récupéré depuis le cache:', cached.userId);
+                console.log('[DISCORD] ✅ userId récupéré depuis le cache:', cached.userId);
                 return res.json({ success: true, userId: cached.userId });
             } else if (cached) {
                 // Token expiré, le supprimer
@@ -658,19 +665,44 @@ app.get('/api/discord/user-id', async (req, res) => {
             }
         }
         
-        // Méthode 2: Vérifier les query params ou headers
-        const userId = req.query.user_id || req.query.userId || req.headers['x-discord-user-id'];
+        // Méthode 2: Vérifier les query params
+        const queryUserId = req.query.user_id || req.query.userId;
+        if (queryUserId) {
+            console.log('[DISCORD] ✅ userId récupéré depuis query params:', queryUserId);
+            return res.json({ success: true, userId: queryUserId });
+        }
         
-        if (userId) {
-            console.log('[DISCORD] userId récupéré depuis query/header:', userId);
-            return res.json({ success: true, userId });
+        // Méthode 3: Vérifier les headers HTTP (Discord peut passer des infos via headers)
+        const headerUserId = req.headers['x-discord-user-id'] || 
+                            req.headers['x-user-id'] ||
+                            req.headers['discord-user-id'];
+        
+        if (headerUserId) {
+            console.log('[DISCORD] ✅ userId récupéré depuis headers:', headerUserId);
+            return res.json({ success: true, userId: headerUserId });
+        }
+        
+        // Méthode 4: Essayer d'extraire depuis le referer (si Discord passe l'info dans l'URL)
+        const referer = req.headers['referer'];
+        if (referer) {
+            try {
+                const refererUrl = new URL(referer);
+                const refererUserId = refererUrl.searchParams.get('user_id') || 
+                                     refererUrl.searchParams.get('userId');
+                if (refererUserId) {
+                    console.log('[DISCORD] ✅ userId récupéré depuis referer:', refererUserId);
+                    return res.json({ success: true, userId: refererUserId });
+                }
+            } catch (e) {
+                // Ignorer les erreurs de parsing URL
+            }
         }
 
         // Si pas de userId, retourner null (l'application devra utiliser localStorage ou autre méthode)
-        console.warn('[DISCORD] userId non disponible');
+        console.warn('[DISCORD] ⚠️ userId non disponible dans la requête');
         res.json({ success: false, message: 'userId non disponible' });
     } catch (error) {
-        console.error('[DISCORD] Erreur:', error);
+        console.error('[DISCORD] ❌ Erreur:', error);
         res.status(500).json({ success: false, message: 'Erreur serveur' });
     }
 });

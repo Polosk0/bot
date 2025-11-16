@@ -94,6 +94,24 @@ const ActivitySystem: React.FC = () => {
     } else if (isDiscordIframe) {
       // Si on est dans un iframe Discord, essayer de récupérer le userId via le SDK Discord
       console.log('[DISCORD] Détection iframe Discord, récupération du userId...');
+      
+      // Écouter les événements personnalisés de GamePage
+      const userIdEventHandler = ((event: CustomEvent) => {
+        const receivedUserId = (event as CustomEvent).detail?.userId;
+        if (receivedUserId) {
+          console.log('[DISCORD] ✅ userId reçu via événement personnalisé:', receivedUserId);
+          setUserId(receivedUserId);
+          fetchBalanceWithId(receivedUserId);
+        }
+      }) as EventListener;
+      
+      window.addEventListener('discordUserIdReceived', userIdEventHandler);
+      
+      // Nettoyer l'écouteur au démontage
+      setTimeout(() => {
+        window.removeEventListener('discordUserIdReceived', userIdEventHandler);
+      }, 10000);
+      
       getDiscordUserId().then((discordUserId) => {
         if (discordUserId) {
           console.log('[DISCORD] ✅ userId récupéré depuis Discord:', discordUserId);
@@ -126,7 +144,50 @@ const ActivitySystem: React.FC = () => {
                 setUserId(retryId);
                 fetchBalanceWithId(retryId);
               } else {
-                setLoading(false);
+                // Dernière tentative : forcer OAuth2 dans l'iframe
+                console.log('[DISCORD] Tentative OAuth2 dans l\'iframe...');
+                const CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID || '';
+                if (CLIENT_ID && (window as any).DiscordSdk) {
+                  // Essayer OAuth2 via le SDK Discord
+                  try {
+                    (window as any).DiscordSdk.ready().then(async () => {
+                      try {
+                        const { code } = await (window as any).DiscordSdk.commands.authorize({
+                          client_id: CLIENT_ID,
+                          response_type: 'code',
+                          state: '',
+                          prompt: 'none',
+                          scope: ['identify'],
+                        });
+                        
+                        const tokenResponse = await fetch('/api/discord/oauth-token', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ code }),
+                        });
+                        
+                        if (tokenResponse.ok) {
+                          const { user_id } = await tokenResponse.json();
+                          if (user_id) {
+                            console.log('[DISCORD] ✅ userId récupéré via OAuth2:', user_id);
+                            setUserId(user_id);
+                            localStorage.setItem('discord_user_id', user_id);
+                            fetchBalanceWithId(user_id);
+                            return;
+                          }
+                        }
+                      } catch (oauthError) {
+                        console.error('[DISCORD] Erreur OAuth2:', oauthError);
+                      }
+                      setLoading(false);
+                    });
+                  } catch (sdkError) {
+                    console.error('[DISCORD] Erreur SDK:', sdkError);
+                    setLoading(false);
+                  }
+                } else {
+                  setLoading(false);
+                }
               }
             }, 3000);
           }
@@ -461,25 +522,84 @@ const ActivitySystem: React.FC = () => {
 
       // Méthode 5: Utiliser postMessage pour communiquer avec le parent Discord
       const messageHandler = (event: MessageEvent) => {
-        // Accepter les messages de Discord
-        if (event.origin.includes('discord.com') || event.origin.includes('discordapp.com')) {
+        console.log('[DISCORD] Message reçu:', event.origin, event.data);
+        
+        // Accepter les messages de Discord (plusieurs domaines possibles)
+        const isDiscordOrigin = event.origin.includes('discord.com') || 
+                                event.origin.includes('discordapp.com') ||
+                                event.origin.includes('discordsays.com');
+        
+        if (isDiscordOrigin) {
           if (event.data && typeof event.data === 'object') {
-            // Discord peut envoyer des données utilisateur
-            if (event.data.user_id || event.data.userId || event.data.user?.id) {
-              const userId = event.data.user_id || event.data.userId || event.data.user?.id;
-              console.log('[DISCORD] userId reçu via postMessage:', userId);
+            // Discord peut envoyer des données utilisateur dans différentes structures
+            let userId = null;
+            
+            // Structure 1: user_id direct
+            if (event.data.user_id) {
+              userId = event.data.user_id;
+            }
+            // Structure 2: userId (camelCase)
+            else if (event.data.userId) {
+              userId = event.data.userId;
+            }
+            // Structure 3: user.id
+            else if (event.data.user?.id) {
+              userId = event.data.user.id;
+            }
+            // Structure 4: member.user.id
+            else if (event.data.member?.user?.id) {
+              userId = event.data.member.user.id;
+            }
+            // Structure 5: data.user_id
+            else if (event.data.data?.user_id) {
+              userId = event.data.data.user_id;
+            }
+            // Structure 6: data.user?.id
+            else if (event.data.data?.user?.id) {
+              userId = event.data.data.user.id;
+            }
+            // Structure 7: Vérifier si c'est un tableau avec des données utilisateur
+            else if (Array.isArray(event.data) && event.data.length > 0) {
+              const firstItem = event.data[0];
+              if (typeof firstItem === 'object') {
+                userId = firstItem.user_id || firstItem.userId || firstItem.user?.id || firstItem.member?.user?.id;
+              }
+            }
+            
+            if (userId) {
+              console.log('[DISCORD] ✅ userId reçu via postMessage:', userId);
               window.removeEventListener('message', messageHandler);
               localStorage.setItem('discord_user_id', userId);
               resolve(userId);
               return;
             }
             
-            if (event.data.type === 'DISCORD_USER_ID') {
-              console.log('[DISCORD] userId reçu via postMessage:', event.data.userId);
-              window.removeEventListener('message', messageHandler);
-              localStorage.setItem('discord_user_id', event.data.userId);
-              resolve(event.data.userId);
-              return;
+            // Vérifier les types de messages spécifiques
+            if (event.data.type === 'DISCORD_USER_ID' || event.data.type === 'USER_ID') {
+              const userId = event.data.userId || event.data.user_id;
+              if (userId) {
+                console.log('[DISCORD] ✅ userId reçu via postMessage (type):', userId);
+                window.removeEventListener('message', messageHandler);
+                localStorage.setItem('discord_user_id', userId);
+                resolve(userId);
+                return;
+              }
+            }
+          }
+          // Vérifier aussi si c'est une string JSON
+          else if (typeof event.data === 'string') {
+            try {
+              const parsed = JSON.parse(event.data);
+              if (parsed.user_id || parsed.userId || parsed.user?.id) {
+                const userId = parsed.user_id || parsed.userId || parsed.user?.id;
+                console.log('[DISCORD] ✅ userId reçu via postMessage (JSON string):', userId);
+                window.removeEventListener('message', messageHandler);
+                localStorage.setItem('discord_user_id', userId);
+                resolve(userId);
+                return;
+              }
+            } catch (e) {
+              // Pas du JSON, continuer
             }
           }
         }
@@ -487,17 +607,38 @@ const ActivitySystem: React.FC = () => {
 
       window.addEventListener('message', messageHandler);
 
-      // Demander le userId au parent Discord
+      // Demander le userId au parent Discord avec plusieurs formats
       if (window.parent && window.parent !== window) {
         try {
+          // Essayer plusieurs formats de messages
           window.parent.postMessage({ type: 'GET_DISCORD_USER_ID' }, '*');
           window.parent.postMessage({ type: 'REQUEST_USER_ID' }, '*');
+          window.parent.postMessage({ type: 'GET_USER_ID' }, '*');
+          window.parent.postMessage('GET_USER_ID', '*');
+          
+          // Essayer aussi via l'API Discord si disponible
+          if ((window.parent as any).DiscordSdk) {
+            try {
+              (window.parent as any).DiscordSdk.ready().then(() => {
+                (window.parent as any).DiscordSdk.commands.getUser().then((user: any) => {
+                  if (user?.id) {
+                    console.log('[DISCORD] ✅ userId récupéré via parent DiscordSdk:', user.id);
+                    window.removeEventListener('message', messageHandler);
+                    localStorage.setItem('discord_user_id', user.id);
+                    resolve(user.id);
+                  }
+                }).catch(() => {});
+              }).catch(() => {});
+            } catch (e) {
+              // Ignorer les erreurs
+            }
+          }
         } catch (error) {
           console.error('[DISCORD] Erreur postMessage:', error);
         }
       }
 
-      // Timeout après 5 secondes (augmenté pour laisser plus de temps au SDK)
+      // Timeout après 8 secondes (augmenté pour laisser plus de temps)
       setTimeout(() => {
         window.removeEventListener('message', messageHandler);
         const storedId = localStorage.getItem('discord_user_id');
@@ -506,9 +647,18 @@ const ActivitySystem: React.FC = () => {
           resolve(storedId);
         } else {
           console.warn('[DISCORD] Timeout - userId non récupéré depuis Discord');
-          resolve(null);
+          // Dernière tentative : essayer de récupérer depuis l'URL ou les headers
+          const urlParams = new URLSearchParams(window.location.search);
+          const urlUserId = urlParams.get('user_id') || urlParams.get('userId');
+          if (urlUserId) {
+            console.log('[DISCORD] userId trouvé dans URL après timeout:', urlUserId);
+            localStorage.setItem('discord_user_id', urlUserId);
+            resolve(urlUserId);
+          } else {
+            resolve(null);
+          }
         }
-      }, 5000);
+      }, 8000);
     });
   };
 
@@ -559,12 +709,44 @@ const ActivitySystem: React.FC = () => {
     setBalance(newBalance);
   };
 
-  if (loading) {
+  if (loading && !userId) {
     return (
       <div className="activity-system">
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>Chargement...</p>
+          <p>Connexion à Discord...</p>
+          <p style={{ fontSize: '0.9rem', marginTop: '1rem', opacity: 0.7 }}>
+            Si le chargement prend trop de temps, utilisez la commande <code>/activity</code> dans Discord
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!userId && !loading) {
+    return (
+      <div className="activity-system">
+        <div className="error-container" style={{ textAlign: 'center', padding: '2rem' }}>
+          <h2>⚠️ Connexion requise</h2>
+          <p>Impossible de récupérer votre identifiant Discord.</p>
+          <p style={{ marginTop: '1rem' }}>
+            Veuillez utiliser la commande <code>/activity</code> dans Discord pour accéder au système.
+          </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{ 
+              marginTop: '1rem', 
+              padding: '0.75rem 1.5rem', 
+              backgroundColor: '#5865F2', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '8px', 
+              cursor: 'pointer',
+              fontSize: '1rem'
+            }}
+          >
+            Réessayer
+          </button>
         </div>
       </div>
     );
