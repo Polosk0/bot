@@ -22,6 +22,20 @@ if (!BOT_API_KEY) {
   console.warn('⚠️  BOT_API_KEY non définie dans le .env ! La vérification ne fonctionnera pas.');
 }
 
+// Cache temporaire pour stocker les userIds des activités Discord (expire après 5 minutes)
+const activityUserCache = new Map();
+const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
+// Nettoyer le cache périodiquement
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of activityUserCache.entries()) {
+    if (now > value.expiresAt) {
+      activityUserCache.delete(key);
+    }
+  }
+}, 60000); // Nettoyer toutes les minutes
+
 // Middleware pour les interactions Discord (doit être avant express.json)
 app.use('/api/interactions', express.raw({ type: 'application/json' }));
 
@@ -157,22 +171,69 @@ app.post('/api/interactions', async (req, res) => {
             // Toutes les autres commandes sont gérées par le bot Discord via WebSocket
             if (commandName === 'activity') {
                 console.log('[INTERACTIONS] ✅ Commande /activity détectée - Traitement de l\'Activity');
-                const gameUrl = `${process.env.WEB_VERIFICATION_URL || 'https://emynona.shop'}/game`;
-                return res.status(200).json({
-                    type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
-                    data: {
-                        content: '🎰 Lancement de la Roue de la Fortune !',
-                        components: [{
-                            type: 1, // ACTION_ROW
+                
+                // Récupérer le userId depuis l'interaction
+                const userId = interaction.member?.user?.id || interaction.user?.id;
+                const action = interaction.data?.options?.[0]?.value || 'crate';
+                
+                console.log('[INTERACTIONS] userId extrait:', userId);
+                console.log('[INTERACTIONS] action:', action);
+                
+                if (userId) {
+                    // Générer un token unique pour cette session d'activité
+                    const sessionToken = `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    
+                    // Stocker le userId dans le cache avec expiration
+                    activityUserCache.set(sessionToken, {
+                        userId: userId,
+                        expiresAt: Date.now() + CACHE_EXPIRY,
+                        createdAt: new Date()
+                    });
+                    
+                    console.log('[INTERACTIONS] userId stocké dans le cache:', userId, 'token:', sessionToken);
+                    
+                    const ACTIVITY_URL = process.env.WEB_VERIFICATION_URL || 'https://emynona.shop';
+                    // Passer le token dans l'URL pour que l'iframe puisse récupérer le userId
+                    const gameUrl = `${ACTIVITY_URL}/activity?action=${action}&token=${sessionToken}`;
+                    
+                    console.log('[INTERACTIONS] URL générée avec token:', gameUrl);
+                    
+                    return res.status(200).json({
+                        type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+                        data: {
+                            content: '🎰 Système €mynona Coins lancé !',
                             components: [{
-                                type: 2, // BUTTON
-                                style: 5, // LINK
-                                label: '🎲 Jouer Maintenant',
-                                url: gameUrl
+                                type: 1, // ACTION_ROW
+                                components: [{
+                                    type: 2, // BUTTON
+                                    style: 5, // LINK
+                                    label: '🎲 Accéder au système',
+                                    url: gameUrl
+                                }]
                             }]
-                        }]
-                    }
-                });
+                        }
+                    });
+                } else {
+                    console.warn('[INTERACTIONS] ⚠️ userId non trouvé dans l\'interaction');
+                    const ACTIVITY_URL = process.env.WEB_VERIFICATION_URL || 'https://emynona.shop';
+                    const gameUrl = `${ACTIVITY_URL}/activity`;
+                    
+                    return res.status(200).json({
+                        type: 4,
+                        data: {
+                            content: '🎰 Système €mynona Coins',
+                            components: [{
+                                type: 1,
+                                components: [{
+                                    type: 2,
+                                    style: 5,
+                                    label: '🎲 Accéder',
+                                    url: gameUrl
+                                }]
+                            }]
+                        }
+                    });
+                }
             }
             
             // ⚠️ ATTENTION: Si vous voyez ce message, cela signifie que l'endpoint est mal configuré
@@ -452,19 +513,76 @@ app.post('/api/verify', async (req, res) => {
 });
 
 
+// API pour échanger le code OAuth contre un token (pour Discord SDK)
+app.post('/api/discord/oauth-token', async (req, res) => {
+    try {
+        const { code } = req.body;
+        
+        if (!code) {
+            return res.status(400).json({ success: false, message: 'Code manquant' });
+        }
+
+        if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
+            return res.status(500).json({ success: false, message: 'Configuration Discord manquante' });
+        }
+
+        // Échanger le code contre un token d'accès
+        const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                client_id: DISCORD_CLIENT_ID,
+                client_secret: DISCORD_CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: DISCORD_REDIRECT_URI || 'https://emynona.shop',
+            }),
+        });
+
+        const tokenData = await tokenResponse.json();
+
+        if (!tokenData.access_token) {
+            console.error('[OAUTH TOKEN] Erreur:', tokenData);
+            return res.status(400).json({ success: false, message: 'Impossible d\'obtenir le token' });
+        }
+
+        console.log('[OAUTH TOKEN] Token obtenu avec succès');
+        res.json({ success: true, access_token: tokenData.access_token });
+    } catch (error) {
+        console.error('[OAUTH TOKEN] Erreur:', error);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+});
+
 // API pour obtenir le userId depuis Discord (pour les iframes)
 app.get('/api/discord/user-id', async (req, res) => {
     try {
-        // Cette API peut être appelée depuis l'iframe pour obtenir le userId
-        // Discord peut passer des informations via des headers ou query params
+        // Méthode 1: Récupérer depuis le token de session (pour les activités Discord)
+        const token = req.query.token;
+        if (token) {
+            const cached = activityUserCache.get(token);
+            if (cached && Date.now() < cached.expiresAt) {
+                console.log('[DISCORD] userId récupéré depuis le cache:', cached.userId);
+                return res.json({ success: true, userId: cached.userId });
+            } else if (cached) {
+                // Token expiré, le supprimer
+                activityUserCache.delete(token);
+                console.warn('[DISCORD] Token expiré:', token);
+            }
+        }
+        
+        // Méthode 2: Vérifier les query params ou headers
         const userId = req.query.user_id || req.query.userId || req.headers['x-discord-user-id'];
         
         if (userId) {
-            console.log('[DISCORD] userId récupéré:', userId);
+            console.log('[DISCORD] userId récupéré depuis query/header:', userId);
             return res.json({ success: true, userId });
         }
 
         // Si pas de userId, retourner null (l'application devra utiliser localStorage ou autre méthode)
+        console.warn('[DISCORD] userId non disponible');
         res.json({ success: false, message: 'userId non disponible' });
     } catch (error) {
         console.error('[DISCORD] Erreur:', error);
