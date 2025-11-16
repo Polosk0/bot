@@ -24,7 +24,7 @@ const ActivitySystem: React.FC = () => {
     
     // Gérer le callback OAuth2
     if (code) {
-      handleOAuth2Callback(code, state).then((authenticatedUserId) => {
+      handleOAuth2Callback(code, state || undefined).then((authenticatedUserId) => {
         if (authenticatedUserId) {
           setUserId(authenticatedUserId);
           localStorage.setItem('discord_user_id', authenticatedUserId);
