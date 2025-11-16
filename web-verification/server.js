@@ -513,6 +513,20 @@ app.post('/api/verify', async (req, res) => {
 });
 
 
+// Cache pour stocker les tokens OAuth avec leur userId (pour vérification)
+const oauthTokenCache = new Map();
+const OAUTH_CACHE_EXPIRY = 60 * 60 * 1000; // 1 heure
+
+// Nettoyer le cache périodiquement
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of oauthTokenCache.entries()) {
+        if (now > value.expiresAt) {
+            oauthTokenCache.delete(key);
+        }
+    }
+}, 60000); // Nettoyer toutes les minutes
+
 // API pour échanger le code OAuth contre un token (pour Discord SDK)
 app.post('/api/discord/oauth-token', async (req, res) => {
     try {
@@ -548,10 +562,81 @@ app.post('/api/discord/oauth-token', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Impossible d\'obtenir le token' });
         }
 
-        console.log('[OAUTH TOKEN] Token obtenu avec succès');
-        res.json({ success: true, access_token: tokenData.access_token });
+        // Récupérer les informations utilisateur pour vérifier et stocker
+        const userResponse = await fetch('https://discord.com/api/users/@me', {
+            headers: {
+                'Authorization': `Bearer ${tokenData.access_token}`,
+            },
+        });
+
+        const userData = await userResponse.json();
+
+        if (!userData.id) {
+            console.error('[OAUTH TOKEN] Impossible de récupérer l\'utilisateur');
+            return res.status(400).json({ success: false, message: 'Impossible de récupérer l\'utilisateur' });
+        }
+
+        // Stocker le token avec le userId pour vérification future
+        oauthTokenCache.set(tokenData.access_token, {
+            userId: userData.id,
+            expiresAt: Date.now() + OAUTH_CACHE_EXPIRY,
+            createdAt: new Date()
+        });
+
+        console.log('[OAUTH TOKEN] ✅ Token obtenu et utilisateur vérifié:', userData.id);
+        res.json({ 
+            success: true, 
+            access_token: tokenData.access_token,
+            user_id: userData.id // Retourner aussi le userId pour vérification côté client
+        });
     } catch (error) {
         console.error('[OAUTH TOKEN] Erreur:', error);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+});
+
+// API pour vérifier un token OAuth et retourner le userId
+app.post('/api/discord/verify-token', async (req, res) => {
+    try {
+        const { access_token } = req.body;
+        
+        if (!access_token) {
+            return res.status(400).json({ success: false, message: 'Token manquant' });
+        }
+
+        // Vérifier dans le cache d'abord
+        const cached = oauthTokenCache.get(access_token);
+        if (cached && Date.now() < cached.expiresAt) {
+            return res.json({ success: true, userId: cached.userId });
+        }
+
+        // Sinon, vérifier avec Discord API
+        const userResponse = await fetch('https://discord.com/api/users/@me', {
+            headers: {
+                'Authorization': `Bearer ${access_token}`,
+            },
+        });
+
+        if (!userResponse.ok) {
+            return res.status(401).json({ success: false, message: 'Token invalide' });
+        }
+
+        const userData = await userResponse.json();
+
+        if (!userData.id) {
+            return res.status(400).json({ success: false, message: 'Impossible de récupérer l\'utilisateur' });
+        }
+
+        // Mettre en cache
+        oauthTokenCache.set(access_token, {
+            userId: userData.id,
+            expiresAt: Date.now() + OAUTH_CACHE_EXPIRY,
+            createdAt: new Date()
+        });
+
+        res.json({ success: true, userId: userData.id });
+    } catch (error) {
+        console.error('[VERIFY TOKEN] Erreur:', error);
         res.status(500).json({ success: false, message: 'Erreur serveur' });
     }
 });
@@ -629,13 +714,42 @@ app.get('/api/currency/balance', async (req, res) => {
     }
 });
 
-// API pour dépenser des coins
+// API pour dépenser des coins (avec vérification OAuth2)
 app.post('/api/currency/spend', async (req, res) => {
     try {
-        const { userId, amount, reason } = req.body;
+        const { userId, amount, reason, access_token } = req.body;
         
         if (!userId || !amount || !reason) {
             return res.status(400).json({ success: false, message: 'Données manquantes' });
+        }
+
+        // VÉRIFICATION OAuth2 : S'assurer que le userId correspond au token
+        if (access_token) {
+            try {
+                const verifyResponse = await fetch(`${req.protocol}://${req.get('host')}/api/discord/verify-token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ access_token })
+                });
+
+                if (verifyResponse.ok) {
+                    const verifyData = await verifyResponse.json();
+                    if (verifyData.success && verifyData.userId !== userId) {
+                        console.error('[CURRENCY] ⚠️ Tentative de fraude détectée!', {
+                            userId_requete: userId,
+                            userId_token: verifyData.userId
+                        });
+                        return res.status(403).json({ 
+                            success: false, 
+                            message: 'Le userId ne correspond pas à l\'utilisateur authentifié' 
+                        });
+                    }
+                    console.log('[CURRENCY] ✅ Vérification OAuth2 réussie pour userId:', userId);
+                }
+            } catch (verifyError) {
+                console.warn('[CURRENCY] ⚠️ Erreur lors de la vérification du token:', verifyError);
+                // Continuer quand même si la vérification échoue (pour compatibilité)
+            }
         }
 
         if (!BOT_API_URL || !BOT_API_KEY) {

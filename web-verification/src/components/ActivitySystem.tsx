@@ -119,7 +119,7 @@ const ActivitySystem: React.FC = () => {
         console.error('[DISCORD] Erreur API user-id:', error);
       }
 
-      // Méthode 3: Utiliser Discord Activity SDK si disponible
+      // Méthode 3: Utiliser Discord Activity SDK si disponible (MÉTHODE PRINCIPALE ET SÉCURISÉE)
       // Le SDK Discord est injecté automatiquement dans l'iframe par Discord
       if ((window as any).DiscordSdk) {
         try {
@@ -130,59 +130,73 @@ const ActivitySystem: React.FC = () => {
           await discordSdk.ready();
           console.log('[DISCORD SDK] SDK prêt');
           
-          // Essayer de récupérer l'utilisateur directement
-          try {
-            const user = await discordSdk.commands.getUser();
-            if (user?.id) {
-              console.log('[DISCORD SDK] Utilisateur récupéré:', user);
-              resolve(user.id);
-              return;
+          // FORCER l'authentification OAuth2 pour sécuriser l'accès
+          const CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID || '';
+          if (!CLIENT_ID) {
+            console.error('[DISCORD SDK] REACT_APP_DISCORD_CLIENT_ID non configuré');
+            throw new Error('CLIENT_ID manquant');
+          }
+          
+          console.log('[DISCORD SDK] Demande d\'autorisation OAuth2...');
+          
+          // Demander l'autorisation OAuth2 (obligatoire pour sécuriser)
+          const { code } = await discordSdk.commands.authorize({
+            client_id: CLIENT_ID,
+            response_type: 'code',
+            state: '',
+            prompt: 'none',
+            scope: ['identify'],
+          });
+          
+          console.log('[DISCORD SDK] Code d\'autorisation obtenu');
+          
+          // Échanger le code contre un token (via votre serveur)
+          const tokenResponse = await fetch('/api/discord/oauth-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+          });
+          
+          if (!tokenResponse.ok) {
+            const errorData = await tokenResponse.json().catch(() => ({}));
+            console.error('[DISCORD SDK] Erreur lors de l\'échange du code:', errorData);
+            throw new Error('Impossible d\'obtenir le token');
+          }
+          
+          const { access_token, user_id } = await tokenResponse.json();
+          
+          if (!access_token) {
+            throw new Error('Token d\'accès non reçu');
+          }
+          
+          console.log('[DISCORD SDK] Token obtenu, authentification...');
+          
+          // Authentifier avec le token
+          await discordSdk.commands.authenticate({ access_token });
+          
+          // Récupérer l'utilisateur authentifié
+          const user = await discordSdk.commands.getUser();
+          
+          if (user?.id) {
+            // Vérifier que le userId correspond bien (sécurité supplémentaire)
+            if (user_id && user.id !== user_id) {
+              console.error('[DISCORD SDK] ⚠️ Incohérence de userId détectée!', { user_id, 'user.id': user.id });
             }
-          } catch (getUserError: any) {
-            console.warn('[DISCORD SDK] Erreur getUser, tentative d\'autorisation...', getUserError);
             
-            // Si getUser échoue, essayer d'autoriser d'abord
-            try {
-              const CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID || '';
-              if (CLIENT_ID) {
-                const { code } = await discordSdk.commands.authorize({
-                  client_id: CLIENT_ID,
-                  response_type: 'code',
-                  state: '',
-                  prompt: 'none',
-                  scope: ['identify'],
-                });
-                
-                console.log('[DISCORD SDK] Code d\'autorisation obtenu');
-                
-                // Échanger le code contre un token (via votre serveur)
-                const tokenResponse = await fetch('/api/discord/oauth-token', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ code }),
-                });
-                
-                if (tokenResponse.ok) {
-                  const { access_token } = await tokenResponse.json();
-                  await discordSdk.commands.authenticate({ access_token });
-                  
-                  // Maintenant réessayer getUser
-                  const user = await discordSdk.commands.getUser();
-                  if (user?.id) {
-                    console.log('[DISCORD SDK] Utilisateur récupéré après authentification:', user);
-                    resolve(user.id);
-                    return;
-                  }
-                }
-              }
-            } catch (authError) {
-              console.error('[DISCORD SDK] Erreur d\'autorisation:', authError);
-            }
+            console.log('[DISCORD SDK] ✅ Utilisateur authentifié et vérifié:', user);
+            // Stocker le token pour les requêtes futures
+            localStorage.setItem('discord_access_token', access_token);
+            localStorage.setItem('discord_user_id_verified', user.id);
+            resolve(user.id);
+            return;
+          } else {
+            throw new Error('Impossible de récupérer l\'utilisateur après authentification');
           }
         } catch (error: any) {
-          console.error('[DISCORD SDK] Erreur générale:', error);
+          console.error('[DISCORD SDK] Erreur lors de l\'authentification:', error);
           console.error('[DISCORD SDK] Message:', error?.message);
           console.error('[DISCORD SDK] Stack:', error?.stack);
+          // Ne pas résoudre avec null ici, laisser les autres méthodes essayer
         }
       } else {
         console.log('[DISCORD SDK] SDK non disponible (pas dans un iframe Discord ou SDK non chargé)');

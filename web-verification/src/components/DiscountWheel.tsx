@@ -71,13 +71,17 @@ const DiscountWheel: React.FC<DiscountWheelProps> = ({ userId, balance, onBalanc
 
     setTimeout(async () => {
       try {
+        // Récupérer le token OAuth pour vérification
+        const accessToken = localStorage.getItem('discord_access_token');
+        
         const response = await fetch('/api/currency/spend', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: userId || localStorage.getItem('discord_user_id'),
+            userId: userId || localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id'),
             amount: WHEEL_COST,
-            reason: 'Tour de roue de réductions'
+            reason: 'Tour de roue de réductions',
+            access_token: accessToken || undefined // Envoyer le token pour vérification
           })
         });
 
