@@ -16,12 +16,58 @@ const ActivitySystem: React.FC = () => {
     const action = urlParams.get('action') as ActivityAction;
     const id = urlParams.get('userId');
     const token = urlParams.get('token'); // Token de session pour les activités Discord
+    const code = urlParams.get('code'); // Code OAuth2 retourné par Discord
+    const state = urlParams.get('state'); // State OAuth2 (peut contenir le userId attendu)
     
     // Détecter si on est dans un iframe Discord
     const isDiscordIframe = window.self !== window.top;
     
-    if (id) {
-      // userId directement dans l'URL (lien direct)
+    // Gérer le callback OAuth2
+    if (code) {
+      handleOAuth2Callback(code, state).then((authenticatedUserId) => {
+        if (authenticatedUserId) {
+          setUserId(authenticatedUserId);
+          localStorage.setItem('discord_user_id', authenticatedUserId);
+          // Nettoyer l'URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+          console.error('[OAUTH2] ❌ Authentification échouée');
+          setLoading(false);
+        }
+      });
+      return;
+    }
+    
+    // SÉCURITÉ : Si userId dans l'URL mais pas dans un iframe Discord, forcer l'authentification OAuth2
+    if (id && !isDiscordIframe) {
+      console.warn('[SECURITY] ⚠️ userId dans l\'URL mais pas dans un iframe Discord - Authentification OAuth2 requise');
+      // Vérifier si on a déjà un token valide
+      const storedToken = localStorage.getItem('discord_access_token');
+      const verifiedUserId = localStorage.getItem('discord_user_id_verified');
+      
+      if (storedToken && verifiedUserId === id) {
+        // Token valide et userId correspond
+        console.log('[SECURITY] ✅ Token OAuth2 valide pour userId:', id);
+        setUserId(id);
+      } else {
+        // Forcer l'authentification OAuth2
+        console.log('[SECURITY] 🔐 Authentification OAuth2 requise...');
+        authenticateWithOAuth2(id).then((authenticatedUserId) => {
+          if (authenticatedUserId) {
+            setUserId(authenticatedUserId);
+            localStorage.setItem('discord_user_id', authenticatedUserId);
+          } else {
+            // La redirection va se faire, on ne fait rien ici
+          }
+        }).catch((error) => {
+          console.error('[SECURITY] ❌ Erreur d\'authentification:', error);
+          setLoading(false);
+        });
+        return; // Ne pas continuer avant l'authentification
+      }
+    } else if (id && isDiscordIframe) {
+      // Dans un iframe Discord, on utilisera le SDK (plus sécurisé)
+      // Mais on peut quand même stocker temporairement
       setUserId(id);
       localStorage.setItem('discord_user_id', id);
     } else if (token) {
@@ -89,6 +135,102 @@ const ActivitySystem: React.FC = () => {
       return null;
     } catch (error) {
       console.error('[DISCORD] Erreur API user-id:', error);
+      return null;
+    }
+  };
+
+  const authenticateWithOAuth2 = async (expectedUserId?: string): Promise<string | null> => {
+    try {
+      const CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID || '';
+      if (!CLIENT_ID) {
+        console.error('[OAUTH2] CLIENT_ID non configuré');
+        return null;
+      }
+
+      // Vérifier si on a déjà un token valide
+      const storedToken = localStorage.getItem('discord_access_token');
+      if (storedToken) {
+        const verifyResponse = await fetch('/api/discord/verify-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_token: storedToken })
+        });
+
+        if (verifyResponse.ok) {
+          const verifyData = await verifyResponse.json();
+          if (verifyData.success) {
+            // Vérifier que le userId correspond si attendu
+            if (expectedUserId && verifyData.userId !== expectedUserId) {
+              console.error('[OAUTH2] ⚠️ Le userId ne correspond pas au token');
+              // Token invalide pour cet utilisateur, le supprimer
+              localStorage.removeItem('discord_access_token');
+              localStorage.removeItem('discord_user_id_verified');
+            } else {
+              console.log('[OAUTH2] ✅ Token valide pour userId:', verifyData.userId);
+              localStorage.setItem('discord_user_id_verified', verifyData.userId);
+              return verifyData.userId;
+            }
+          }
+        }
+      }
+
+      // Rediriger vers OAuth2 Discord
+      const redirectUri = `${window.location.origin}/activity`;
+      const scope = 'identify';
+      const state = expectedUserId || '';
+      const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
+      
+      console.log('[OAUTH2] Redirection vers Discord OAuth2...');
+      window.location.href = authUrl;
+      return null; // La redirection va se faire
+    } catch (error) {
+      console.error('[OAUTH2] Erreur:', error);
+      return null;
+    }
+  };
+
+  const handleOAuth2Callback = async (code: string, state?: string): Promise<string | null> => {
+    try {
+      console.log('[OAUTH2] Traitement du callback OAuth2...');
+      
+      // Échanger le code contre un token
+      const tokenResponse = await fetch('/api/discord/oauth-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json().catch(() => ({}));
+        console.error('[OAUTH2] Erreur lors de l\'échange du code:', errorData);
+        return null;
+      }
+
+      const { access_token, user_id } = await tokenResponse.json();
+
+      if (!access_token || !user_id) {
+        console.error('[OAUTH2] Token ou userId manquant');
+        return null;
+      }
+
+      // Vérifier que le userId correspond à celui attendu (si fourni dans state)
+      if (state && state !== user_id) {
+        console.error('[OAUTH2] ⚠️ Le userId ne correspond pas à celui attendu', {
+          expected: state,
+          received: user_id
+        });
+        // On accepte quand même car l'utilisateur s'est authentifié
+        // Mais on log l'alerte
+      }
+
+      // Stocker le token
+      localStorage.setItem('discord_access_token', access_token);
+      localStorage.setItem('discord_user_id_verified', user_id);
+      
+      console.log('[OAUTH2] ✅ Authentification réussie pour userId:', user_id);
+      return user_id;
+    } catch (error) {
+      console.error('[OAUTH2] Erreur lors du callback:', error);
       return null;
     }
   };
@@ -262,14 +404,21 @@ const ActivitySystem: React.FC = () => {
 
   const fetchBalance = async () => {
     try {
-      const id = userId || localStorage.getItem('discord_user_id');
+      const id = userId || localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id');
       if (!id) {
         setLoading(false);
         return;
       }
 
+      // Récupérer le token OAuth pour vérification
+      const accessToken = localStorage.getItem('discord_access_token');
+      
       console.log('[BALANCE] Récupération du solde pour userId:', id);
-      const response = await fetch(`/api/currency/balance?userId=${id}`);
+      const url = accessToken 
+        ? `/api/currency/balance?userId=${id}&access_token=${encodeURIComponent(accessToken)}`
+        : `/api/currency/balance?userId=${id}`;
+      
+      const response = await fetch(url);
       console.log('[BALANCE] Réponse:', response.status, response.statusText);
       
       if (response.ok) {
@@ -279,6 +428,16 @@ const ActivitySystem: React.FC = () => {
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('[BALANCE] Erreur:', errorData);
+        
+        // Si erreur 403, c'est une tentative de fraude détectée
+        if (response.status === 403) {
+          alert('⚠️ Erreur de sécurité : Le userId ne correspond pas à votre compte authentifié.');
+          // Nettoyer et forcer la ré-authentification
+          localStorage.removeItem('discord_access_token');
+          localStorage.removeItem('discord_user_id_verified');
+          localStorage.removeItem('discord_user_id');
+          window.location.reload();
+        }
       }
     } catch (error) {
       console.error('Erreur lors de la récupération du solde:', error);

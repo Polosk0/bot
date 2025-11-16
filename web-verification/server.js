@@ -675,14 +675,43 @@ app.get('/api/discord/user-id', async (req, res) => {
     }
 });
 
-// API pour obtenir le solde d'un utilisateur
+// API pour obtenir le solde d'un utilisateur (avec vérification OAuth2 optionnelle)
 app.get('/api/currency/balance', async (req, res) => {
     try {
-        const { userId } = req.query;
+        const { userId, access_token } = req.query;
         
         if (!userId) {
             console.warn('[CURRENCY] userId manquant dans la requête');
             return res.status(400).json({ success: false, message: 'userId manquant' });
+        }
+
+        // VÉRIFICATION OAuth2 : Si un token est fourni, vérifier qu'il correspond au userId
+        if (access_token) {
+            try {
+                const verifyResponse = await fetch(`${req.protocol}://${req.get('host')}/api/discord/verify-token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ access_token })
+                });
+
+                if (verifyResponse.ok) {
+                    const verifyData = await verifyResponse.json();
+                    if (verifyData.success && verifyData.userId !== userId) {
+                        console.error('[CURRENCY] ⚠️ Tentative de fraude détectée!', {
+                            userId_requete: userId,
+                            userId_token: verifyData.userId
+                        });
+                        return res.status(403).json({ 
+                            success: false, 
+                            message: 'Le userId ne correspond pas à l\'utilisateur authentifié' 
+                        });
+                    }
+                    console.log('[CURRENCY] ✅ Vérification OAuth2 réussie pour userId:', userId);
+                }
+            } catch (verifyError) {
+                console.warn('[CURRENCY] ⚠️ Erreur lors de la vérification du token:', verifyError);
+                // Continuer quand même si la vérification échoue (pour compatibilité)
+            }
         }
 
         console.log('[CURRENCY] Récupération du solde pour userId:', userId);
