@@ -34,10 +34,6 @@ pm2 restart discord-bot
 echo "⏳ Attente du démarrage du bot..."
 sleep 5
 
-# Vérifier les logs
-echo "📋 Vérification des logs de synchronisation..."
-pm2 logs discord-bot --lines 200 --nostream 2>/dev/null | grep -E "Synchronisation|synchronisées|Commandes:|balance|rewards|add-coins|sync-commands" | tail -20 || echo "⚠️  Aucune ligne de synchronisation trouvée dans les logs récents"
-
 echo ""
 echo "✅ Déploiement terminé!"
 echo "💡 Utilisez /sync-commands dans Discord pour forcer la synchronisation si nécessaire"
