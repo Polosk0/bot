@@ -13,14 +13,16 @@ const ACTIVITY_URL = process.env.ACTIVITY_URL || process.env.WEB_VERIFICATION_UR
 export const activity: Command = {
     data: new SlashCommandBuilder()
         .setName('activity')
-        .setDescription('Lancer l\'activité de vérification Discord')
+        .setDescription('Accéder au système de monnaie €mynona - Caisses, Roue de réductions et plus !')
         .addStringOption(option =>
             option
                 .setName('action')
                 .setDescription('Action à effectuer')
                 .setRequired(false)
                 .addChoices(
-                    { name: 'Lancer l\'activité', value: 'launch' },
+                    { name: 'Ouvrir une caisse', value: 'crate' },
+                    { name: 'Tourner la roue', value: 'wheel' },
+                    { name: 'Voir mon solde', value: 'balance' },
                     { name: 'Afficher le lien', value: 'link' }
                 )
         ),
@@ -32,14 +34,34 @@ export const activity: Command = {
 
             if (action === 'link') {
                 const embed = new EmbedBuilder()
-                    .setTitle('🔗 Lien de Vérification')
-                    .setDescription(`Cliquez sur le lien ci-dessous pour accéder à la page de vérification :`)
+                    .setTitle('🔗 Lien du Système €mynona')
+                    .setDescription(`Cliquez sur le lien ci-dessous pour accéder au système de monnaie :`)
                     .addFields({
                         name: '🌐 URL',
-                        value: `[${ACTIVITY_URL}/verify](${ACTIVITY_URL}/verify)`
+                        value: `[${ACTIVITY_URL}/activity](${ACTIVITY_URL}/activity)`
                     })
                     .setColor('#5865F2')
-                    .setFooter({ text: '€mynona Market • Système de vérification' })
+                    .setFooter({ text: '€mynona Market • Système de monnaie' })
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            if (action === 'balance') {
+                const { CurrencyManager } = await import('../../managers/currencyManager');
+                const balance = CurrencyManager.getBalance(interaction.user.id);
+                const totalInvites = await CurrencyManager.getTotalInvites(interaction.user.id);
+                
+                const embed = new EmbedBuilder()
+                    .setTitle('💰 Votre Solde')
+                    .setDescription(`Vous possédez **${balance}** €mynona Coins`)
+                    .addFields(
+                        { name: '👥 Invitations', value: `${totalInvites}`, inline: true },
+                        { name: '💎 Utilisation', value: 'Utilisez `/activity crate` ou `/activity wheel` pour dépenser vos coins !', inline: false }
+                    )
+                    .setColor('#00ff00')
+                    .setFooter({ text: '€mynona Market • Système de monnaie' })
                     .setTimestamp();
 
                 await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
@@ -68,33 +90,34 @@ export const activity: Command = {
             try {
                 const inviteCode = await createActivityInvite(interaction.guild.id, applicationId);
                 
-                if (inviteCode) {
-                    const embed = new EmbedBuilder()
-                        .setTitle('✅ Activité Lancée')
-                        .setDescription(`L'activité de vérification a été lancée avec succès !`)
-                        .addFields({
-                            name: '🔗 Lien d\'invitation',
-                            value: `[Rejoindre l'activité](https://discord.gg/${inviteCode})`
-                        })
-                        .setColor('#00ff00')
-                        .setFooter({ text: '€mynona Market • Activité Discord' })
-                        .setTimestamp();
+                const actionType = action || 'crate';
+                const gameUrl = `${ACTIVITY_URL}/activity?action=${actionType}&userId=${interaction.user.id}`;
+                
+                const embed = new EmbedBuilder()
+                    .setTitle('🎰 Système €mynona Coins')
+                    .setDescription(`Accédez au système de monnaie pour ouvrir des caisses, tourner la roue et gagner des récompenses !`)
+                    .addFields(
+                        {
+                            name: '📦 Caisses',
+                            value: 'Ouvrez des caisses pour gagner des récompenses exclusives',
+                            inline: true
+                        },
+                        {
+                            name: '🎡 Roue de Réductions',
+                            value: 'Tournez la roue pour gagner des réductions sur vos achats',
+                            inline: true
+                        },
+                        {
+                            name: '🔗 Accès',
+                            value: `[Cliquez ici pour accéder](${gameUrl})`,
+                            inline: false
+                        }
+                    )
+                    .setColor('#5865F2')
+                    .setFooter({ text: '€mynona Market • Système de monnaie' })
+                    .setTimestamp();
 
-                    await interaction.reply({ embeds: [embed] });
-                } else {
-                    const embed = new EmbedBuilder()
-                        .setTitle('🌐 Page de Vérification')
-                        .setDescription(`Accédez à la page de vérification pour compléter votre profil :`)
-                        .addFields({
-                            name: '🔗 URL',
-                            value: `[${ACTIVITY_URL}/verify](${ACTIVITY_URL}/verify)`
-                        })
-                        .setColor('#5865F2')
-                        .setFooter({ text: '€mynona Market • Système de vérification' })
-                        .setTimestamp();
-
-                    await interaction.reply({ embeds: [embed] });
-                }
+                await interaction.reply({ embeds: [embed] });
             } catch (error: any) {
                 logger.error('Erreur lors du lancement de l\'activité:', error);
                 

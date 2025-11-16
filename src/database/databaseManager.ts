@@ -1,5 +1,5 @@
 import { Collection } from 'discord.js';
-import { UserData, ServerConfig, CaptchaData, TicketData, VouchData, LogData, UserOAuthToken } from '../types/database';
+import { UserData, ServerConfig, CaptchaData, TicketData, VouchData, LogData, UserOAuthToken, CurrencyTransaction } from '../types/database';
 import { logger } from '../utils/logger';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
@@ -14,6 +14,8 @@ interface DatabaseSchema {
   logs: { [key: string]: any };
   messages: { [key: string]: any };
   warns: { [key: string]: any };
+  currencyTransactions: { [key: string]: any };
+  memberInvites: { [key: string]: any };
 }
 
 export class DatabaseManager {
@@ -60,7 +62,9 @@ export class DatabaseManager {
       vouches: {},
       logs: {},
       messages: {},
-      warns: {}
+      warns: {},
+      currencyTransactions: {},
+      memberInvites: {}
     };
   }
 
@@ -385,5 +389,41 @@ export class DatabaseManager {
   deleteCaptcha(captchaId: string): void {
     delete DatabaseManager.data.captchas[captchaId];
     this.saveDatabase();
+  }
+
+  addCurrencyTransaction(transaction: CurrencyTransaction): void {
+    if (!DatabaseManager.data.currencyTransactions) {
+      DatabaseManager.data.currencyTransactions = {};
+    }
+    DatabaseManager.data.currencyTransactions[transaction.id] = {
+      ...transaction,
+      createdAt: transaction.createdAt.getTime()
+    };
+    this.saveDatabase();
+  }
+
+  getCurrencyTransactionsByUser(userId: string): CurrencyTransaction[] {
+    if (!DatabaseManager.data.currencyTransactions) {
+      return [];
+    }
+    return Object.values(DatabaseManager.data.currencyTransactions)
+      .filter((t: any) => t.userId === userId)
+      .map((t: any) => ({
+        ...t,
+        createdAt: new Date(t.createdAt)
+      }))
+      .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  getCurrencyTransaction(transactionId: string): CurrencyTransaction | undefined {
+    if (!DatabaseManager.data.currencyTransactions) {
+      return undefined;
+    }
+    const transaction = DatabaseManager.data.currencyTransactions[transactionId];
+    if (!transaction) return undefined;
+    return {
+      ...transaction,
+      createdAt: new Date(transaction.createdAt)
+    };
   }
 }

@@ -21,6 +21,10 @@ export interface UserData {
   oauthScope?: string[];
   oauthExpiresAt?: Date;
   hasOAuth?: boolean;
+  emynonaCoins?: number;
+  totalInvites?: number;
+  rankFactor?: number;
+  lastInviteRewardClaimed?: number;
 }
 
 export interface UserOAuthToken {
@@ -99,5 +103,29 @@ export interface LogData {
   amount?: number;
   data: any;
   timestamp: Date;
+}
+
+export interface CurrencyTransaction {
+  id: string;
+  userId: string;
+  type: 'earn' | 'spend' | 'reward';
+  amount: number;
+  reason: string;
+  metadata?: any;
+  createdAt: Date;
+}
+
+export interface InviteRewardTier {
+  tier: number;
+  invitesRequired: number;
+  coinsReward: number;
+  name: string;
+}
+
+export interface LoyaltyRewardTier {
+  tier: number;
+  rankFactorRequired: number;
+  coinsReward: number;
+  name: string;
 }
 

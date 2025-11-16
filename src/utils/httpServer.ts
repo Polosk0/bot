@@ -3,6 +3,7 @@ import { Client, GuildMember, EmbedBuilder } from 'discord.js';
 import { DatabaseManager } from '../database/databaseManager';
 import { LogManager } from '../managers/logManager';
 import { WebhookManager } from '../managers/webhookManager';
+import { CurrencyManager } from '../managers/currencyManager';
 import { logger } from './logger';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -43,7 +44,8 @@ export class HttpServer {
       const isHealth = req.path === '/health';
       const isLogDownload = req.path.startsWith('/api/logs/download');
       const isVerification = req.path === '/api/verify' && req.method === 'POST';
-      if (isHealth || isLogDownload || isVerification) {
+      const isCurrencyBalance = req.path === '/api/currency/balance' && req.method === 'GET';
+      if (isHealth || isLogDownload || isVerification || isCurrencyBalance) {
         return next();
       }
 
@@ -271,7 +273,10 @@ export class HttpServer {
         endpoints: {
           'GET /health': 'Vérifier le statut du serveur (pas de clé API requise)',
           'POST /api/verify': 'Vérifier un utilisateur via OAuth2 (clé API requise)',
-          'GET /api/logs/download/:filename': 'Télécharger un fichier de log (pas de clé API requise)'
+          'GET /api/logs/download/:filename': 'Télécharger un fichier de log (pas de clé API requise)',
+          'GET /api/currency/balance': 'Obtenir le solde d\'un utilisateur (pas de clé API requise)',
+          'POST /api/currency/spend': 'Dépenser des coins (clé API requise)',
+          'POST /api/rewards/claim': 'Enregistrer une récompense (clé API requise)'
         },
         note: 'Pour utiliser /api/verify, envoyez la clé API via le header "x-api-key" ou le paramètre "apiKey"'
       });
@@ -300,6 +305,121 @@ export class HttpServer {
         res.status(500).json({ 
           success: false, 
           message: 'Erreur lors de la lecture du fichier' 
+        });
+      }
+    });
+
+    this.app.get('/api/currency/balance', async (req: Request, res: Response) => {
+      try {
+        const userId = req.query.userId as string;
+        
+        if (!userId) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'userId est requis' 
+          });
+        }
+
+        const balance = CurrencyManager.getBalance(userId);
+        const totalInvites = await CurrencyManager.getTotalInvites(userId);
+        
+        res.json({ 
+          success: true, 
+          balance,
+          totalInvites
+        });
+      } catch (error) {
+        logger.error('Erreur lors de la récupération du solde:', error);
+        res.status(500).json({ 
+          success: false, 
+          message: 'Erreur lors de la récupération du solde' 
+        });
+      }
+    });
+
+    this.app.post('/api/currency/spend', async (req: Request, res: Response) => {
+      try {
+        const { userId, amount, reason } = req.body;
+        
+        if (!userId || !amount || !reason) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'userId, amount et reason sont requis' 
+          });
+        }
+
+        const success = CurrencyManager.spendCoins(userId, amount, reason);
+        
+        if (!success) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'Solde insuffisant ou erreur lors de la dépense' 
+          });
+        }
+
+        const newBalance = CurrencyManager.getBalance(userId);
+        
+        res.json({ 
+          success: true, 
+          newBalance,
+          amountSpent: amount
+        });
+      } catch (error) {
+        logger.error('Erreur lors de la dépense:', error);
+        res.status(500).json({ 
+          success: false, 
+          message: 'Erreur lors de la dépense' 
+        });
+      }
+    });
+
+    this.app.post('/api/rewards/claim', async (req: Request, res: Response) => {
+      try {
+        const { userId, rewardId, rewardName, rewardType, discount } = req.body;
+        
+        if (!userId || !rewardId || !rewardName) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'userId, rewardId et rewardName sont requis' 
+          });
+        }
+
+        logger.info(`[REWARDS] Récompense réclamée: ${rewardName} (${rewardId}) par utilisateur ${userId}`);
+        
+        const transaction: any = {
+          id: `reward_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          userId,
+          type: 'reward',
+          amount: 0,
+          reason: `Récompense: ${rewardName}`,
+          metadata: {
+            rewardId,
+            rewardName,
+            rewardType,
+            discount
+          },
+          createdAt: new Date()
+        };
+
+        this.databaseManager.addCurrencyTransaction(transaction);
+        
+        res.json({ 
+          success: true, 
+          message: 'Récompense enregistrée',
+          reward: {
+            id: rewardId,
+            name: rewardName,
+            userId,
+            type: rewardType,
+            discount,
+            claimedAt: new Date().toISOString()
+          }
+        });
+      } catch (error) {
+        logger.error('[REWARDS] Erreur:', error);
+        res.status(500).json({ 
+          success: false, 
+          message: 'Erreur serveur' 
         });
       }
     });

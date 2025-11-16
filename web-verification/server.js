@@ -452,10 +452,78 @@ app.post('/api/verify', async (req, res) => {
 });
 
 
+// API pour obtenir le solde d'un utilisateur
+app.get('/api/currency/balance', async (req, res) => {
+    try {
+        const { userId } = req.query;
+        
+        if (!userId) {
+            return res.status(400).json({ success: false, message: 'userId manquant' });
+        }
+
+        if (!BOT_API_URL || !BOT_API_KEY) {
+            return res.status(500).json({ success: false, message: 'Configuration manquante' });
+        }
+
+        const botResponse = await fetch(`${BOT_API_URL}/api/currency/balance?userId=${userId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': BOT_API_KEY
+            }
+        });
+
+        if (!botResponse.ok) {
+            return res.status(botResponse.status).json({ success: false, message: 'Erreur du serveur bot' });
+        }
+
+        const data = await botResponse.json();
+        res.json(data);
+    } catch (error) {
+        console.error('[CURRENCY] Erreur:', error);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+});
+
+// API pour dépenser des coins
+app.post('/api/currency/spend', async (req, res) => {
+    try {
+        const { userId, amount, reason } = req.body;
+        
+        if (!userId || !amount || !reason) {
+            return res.status(400).json({ success: false, message: 'Données manquantes' });
+        }
+
+        if (!BOT_API_URL || !BOT_API_KEY) {
+            return res.status(500).json({ success: false, message: 'Configuration manquante' });
+        }
+
+        const botResponse = await fetch(`${BOT_API_URL}/api/currency/spend`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': BOT_API_KEY
+            },
+            body: JSON.stringify({ userId, amount, reason })
+        });
+
+        if (!botResponse.ok) {
+            const errorData = await botResponse.json();
+            return res.status(botResponse.status).json({ success: false, message: errorData.message || 'Erreur du serveur bot' });
+        }
+
+        const data = await botResponse.json();
+        res.json(data);
+    } catch (error) {
+        console.error('[CURRENCY] Erreur:', error);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+});
+
 // API pour sauvegarder les récompenses gagnées
 app.post('/api/rewards/claim', async (req, res) => {
     try {
-        const { userId, rewardId, rewardName } = req.body;
+        const { userId, rewardId, rewardName, rewardType, discount } = req.body;
         
         if (!userId || !rewardId || !rewardName) {
             return res.status(400).json({ success: false, message: 'Données manquantes' });
@@ -463,20 +531,26 @@ app.post('/api/rewards/claim', async (req, res) => {
 
         console.log(`[REWARDS] Récompense réclamée: ${rewardName} (${rewardId}) par utilisateur ${userId}`);
         
-        // Ici, vous pouvez sauvegarder la récompense dans une base de données
-        // Pour l'instant, on log juste
-        // TODO: Implémenter la sauvegarde dans la base de données
-        
-        res.json({ 
-            success: true, 
-            message: 'Récompense enregistrée',
-            reward: {
-                id: rewardId,
-                name: rewardName,
-                userId: userId,
-                claimedAt: new Date().toISOString()
-            }
+        if (!BOT_API_URL || !BOT_API_KEY) {
+            return res.status(500).json({ success: false, message: 'Configuration manquante' });
+        }
+
+        const botResponse = await fetch(`${BOT_API_URL}/api/rewards/claim`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': BOT_API_KEY
+            },
+            body: JSON.stringify({ userId, rewardId, rewardName, rewardType, discount })
         });
+
+        if (!botResponse.ok) {
+            const errorData = await botResponse.json();
+            return res.status(botResponse.status).json({ success: false, message: errorData.message || 'Erreur du serveur bot' });
+        }
+
+        const data = await botResponse.json();
+        res.json(data);
     } catch (error) {
         console.error('[REWARDS] Erreur:', error);
         res.status(500).json({ success: false, message: 'Erreur serveur' });
