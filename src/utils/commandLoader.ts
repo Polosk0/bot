@@ -26,9 +26,10 @@ export async function loadCommands(client: Client) {
         
         if (commandExport) {
           (client as any).commands.set(commandExport.data.name, commandExport);
-          logger.info(`Commande chargée: ${commandExport.data.name}`);
+          logger.info(`✅ Commande chargée: ${commandExport.data.name} (${folder}/${file})`);
         } else {
-          logger.warn(`La commande dans ${filePath} n'a pas de propriété "data" ou "execute" requise.`);
+          logger.warn(`⚠️ La commande dans ${filePath} n'a pas de propriété "data" ou "execute" requise.`);
+          logger.warn(`   Exports trouvés: ${Object.keys(commandModule).join(', ')}`);
         }
       } catch (error) {
         logger.error(`Erreur lors du chargement de la commande ${filePath}:`, error);

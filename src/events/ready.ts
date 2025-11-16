@@ -19,10 +19,16 @@ export async function execute(client: Client) {
   // Synchroniser les commandes slash
   try {
     const commands = Array.from((client as any).commands.values()).map((cmd: any) => cmd.data.toJSON());
+    const commandNames = commands.map((cmd: any) => cmd.name).join(', ');
+    logger.info(`Synchronisation de ${commands.length} commandes avec Discord: ${commandNames}`);
     await client.application?.commands.set(commands);
-    logger.info(`${commands.length} commandes slash synchronisées`);
+    logger.info(`✅ ${commands.length} commandes slash synchronisées avec succès`);
   } catch (error) {
     logger.error('Erreur lors de la synchronisation des commandes:', error);
+    if (error instanceof Error) {
+      logger.error(`Détails de l'erreur: ${error.message}`);
+      logger.error(`Stack: ${error.stack}`);
+    }
   }
 
   // Le cache des invitations est initialisé via InviteManager dans index.ts
