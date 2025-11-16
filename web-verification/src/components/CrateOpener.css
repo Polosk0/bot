@@ -1,13 +1,8 @@
 .crate-opener {
   min-height: 100vh;
   padding: 0;
-  background: #0a0e27;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.1) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
-  color: white;
+  background: var(--gradient-bg);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -15,29 +10,66 @@
   overflow-x: hidden;
 }
 
+.crate-opener::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(255, 215, 0, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(88, 101, 242, 0.06) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.crate-opener::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(rgba(255, 215, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 215, 0, 0.02) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: gridMove 30s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+}
+
+@keyframes gridMove {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(60px, 60px); }
+}
+
 .back-button {
   align-self: flex-start;
   margin: 2rem 0 0 2rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-card);
   backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
   padding: 0.75rem 1.5rem;
-  border-radius: 12px;
+  border-radius: var(--border-radius-md);
   cursor: pointer;
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: var(--font-weight-semibold);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   z-index: 10;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  font-family: var(--font-primary);
 }
 
 .back-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 215, 0, 0.4);
   transform: translateX(-4px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 24px rgba(255, 215, 0, 0.2);
 }
 
 .crate-container {
@@ -51,36 +83,39 @@
 
 .crate-container h2 {
   font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 700;
+  font-weight: var(--font-weight-extrabold);
   margin-bottom: 1rem;
-  background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%);
+  background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--letter-spacing-tight);
+  font-family: var(--font-heading);
 }
 
 .crate-cost {
   font-size: 1.25rem;
   margin-bottom: 0.5rem;
-  color: #fbbf24;
-  font-weight: 600;
+  color: var(--primary-gold);
+  font-weight: var(--font-weight-bold);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  font-family: var(--font-primary);
 }
 
 .balance-info {
   font-size: 1rem;
   margin-bottom: 2.5rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
+  font-family: var(--font-primary);
 }
 
 .crate-box {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-card);
   backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 32px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--border-radius-xl);
   padding: 4rem 3rem;
   margin-bottom: 3rem;
   min-height: 450px;
@@ -97,11 +132,21 @@
 .crate-box::before {
   content: '';
   position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+}
+
+.crate-box::after {
+  content: '';
+  position: absolute;
   top: -50%;
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 70%);
   animation: rotate 20s linear infinite;
   pointer-events: none;
 }
@@ -113,10 +158,11 @@
 
 .crate-box.opening {
   animation: crateShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite;
-  border-color: rgba(168, 85, 247, 0.5);
+  border-color: rgba(255, 215, 0, 0.6);
   box-shadow: 
-    0 20px 60px rgba(168, 85, 247, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    0 20px 60px rgba(255, 215, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 40px rgba(255, 215, 0, 0.2);
 }
 
 @keyframes crateShake {
@@ -149,7 +195,7 @@
   transform: translate(-50%, -50%);
   width: 120%;
   height: 120%;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.2) 0%, transparent 70%);
   border-radius: 50%;
   animation: pulse 2s ease-in-out infinite;
 }
@@ -165,20 +211,21 @@
 }
 
 .open-button {
-  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  background: var(--gradient-primary);
   border: none;
-  color: white;
+  color: var(--bg-primary);
   padding: 1.25rem 3rem;
-  border-radius: 16px;
+  border-radius: var(--border-radius-lg);
   font-size: 1.1rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-bold);
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 
-    0 8px 24px rgba(99, 102, 241, 0.4),
+    0 8px 24px rgba(255, 215, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
   position: relative;
   overflow: hidden;
+  font-family: var(--font-primary);
 }
 
 .open-button::before {
@@ -199,7 +246,7 @@
 .open-button:hover:not(.disabled) {
   transform: translateY(-2px) scale(1.02);
   box-shadow: 
-    0 12px 32px rgba(99, 102, 241, 0.5),
+    0 12px 32px rgba(255, 215, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
@@ -223,7 +270,7 @@
   position: absolute;
   font-size: 2.5rem;
   animation: sparkleFloat 2s ease-in-out infinite;
-  filter: drop-shadow(0 4px 8px rgba(255, 255, 255, 0.5));
+  filter: drop-shadow(0 4px 8px rgba(255, 215, 0, 0.5));
 }
 
 .sparkle:nth-child(1) {
@@ -259,7 +306,7 @@
   text-align: center;
   padding: 3rem 2.5rem;
   border: 2px solid;
-  border-radius: 24px;
+  border-radius: var(--border-radius-xl);
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(20px) saturate(180%);
   box-shadow: 
@@ -297,54 +344,60 @@
 
 .reward-result h3 {
   font-size: 2rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-extrabold);
   margin-bottom: 1rem;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--letter-spacing-tight);
+  font-family: var(--font-heading);
+  color: var(--text-primary);
 }
 
 .rarity-badge {
   display: inline-block;
   padding: 0.5rem 1.25rem;
-  border-radius: 12px;
-  font-weight: 700;
+  border-radius: var(--border-radius-md);
+  font-weight: var(--font-weight-extrabold);
   font-size: 0.85rem;
   margin-bottom: 1.5rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--letter-spacing-wider);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  font-family: var(--font-primary);
 }
 
 .reward-message {
   margin-bottom: 2rem;
-  color: rgba(255, 255, 255, 0.8);
-  line-height: 1.7;
+  color: var(--text-secondary);
+  line-height: var(--line-height-relaxed);
   font-size: 1rem;
+  font-family: var(--font-primary);
 }
 
 .close-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
   padding: 0.875rem 2rem;
-  border-radius: 12px;
+  border-radius: var(--border-radius-md);
   cursor: pointer;
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: var(--font-weight-semibold);
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
+  font-family: var(--font-primary);
 }
 
 .close-button:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 215, 0, 0.4);
   transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
 }
 
 .rewards-preview {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-card);
   backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--border-radius-xl);
   padding: 2.5rem;
   width: 100%;
   box-shadow: 
@@ -352,12 +405,25 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
+.rewards-preview::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+  border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
+}
+
 .rewards-preview h3 {
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-bold);
   margin-bottom: 2rem;
   text-align: center;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--letter-spacing-tight);
+  font-family: var(--font-heading);
+  color: var(--text-primary);
 }
 
 .rewards-grid {
@@ -367,9 +433,9 @@
 }
 
 .reward-preview-item {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 215, 0, 0.05);
   border: 1px solid;
-  border-radius: 16px;
+  border-radius: var(--border-radius-lg);
   padding: 1.5rem 1rem;
   text-align: center;
   display: flex;
@@ -381,8 +447,8 @@
 
 .reward-preview-item:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 20px rgba(255, 215, 0, 0.2);
+  background: rgba(255, 215, 0, 0.1);
 }
 
 .preview-emoji {
@@ -392,15 +458,17 @@
 
 .preview-name {
   font-size: 0.9rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-family: var(--font-primary);
 }
 
 .preview-rarity {
   font-size: 0.75rem;
   text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: var(--letter-spacing-wider);
+  font-family: var(--font-primary);
 }
 
 @media (max-width: 768px) {
@@ -423,7 +491,7 @@
   .crate-box {
     padding: 3rem 2rem;
     min-height: 350px;
-    border-radius: 24px;
+    border-radius: var(--border-radius-lg);
   }
 
   .crate-icon {
