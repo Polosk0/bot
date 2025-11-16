@@ -1,7 +1,7 @@
 import { DatabaseManager } from '../src/database/databaseManager';
 import { CurrencyManager } from '../src/managers/currencyManager';
 
-const USER_ID = '1088121021044887572';
+const USER_ID = '1081288703491719378';
 const INFINITE_AMOUNT = Number.MAX_SAFE_INTEGER; // 9,007,199,254,740,991
 
 async function setInfiniteCoins() {
