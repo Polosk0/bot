@@ -24,13 +24,47 @@ const ActivitySystem: React.FC = () => {
     
     // VÉRIFICATION CRITIQUE : Si on est dans un iframe Discord mais qu'il n'y a pas de token/userId dans l'URL,
     // cela signifie que Discord a chargé l'activité directement depuis l'URL configurée dans le Developer Portal.
-    // Dans ce cas, on doit utiliser la commande /activity pour obtenir le userId.
+    // Dans ce cas, on doit essayer de récupérer le userId depuis les paramètres Discord dans l'URL.
     if (isDiscordIframe && !token && !id) {
       console.warn('[DISCORD] ⚠️ Aucun token/userId dans l\'URL - Discord a chargé l\'activité directement');
-      console.warn('[DISCORD] ⚠️ L\'utilisateur doit utiliser la commande /activity pour obtenir le userId');
       
-      // Essayer quand même de récupérer depuis l'API (peut-être que Discord a stocké quelque chose)
-      // Mais on affichera un message d'erreur si ça ne fonctionne pas
+      // Essayer de récupérer le userId depuis les paramètres Discord dans l'URL
+      // Discord passe parfois des infos dans l'URL comme instance_id, guild_id, channel_id
+      const fullUrl = window.location.href;
+      const urlParamsFull = new URLSearchParams(window.location.search);
+      
+      // Vérifier si Discord a passé des paramètres dans l'URL
+      const instanceId = urlParamsFull.get('instance_id');
+      const guildId = urlParamsFull.get('guild_id');
+      const channelId = urlParamsFull.get('channel_id');
+      
+      if (instanceId || guildId || channelId) {
+        console.log('[DISCORD] Paramètres Discord détectés:', { instanceId, guildId, channelId });
+        
+        // Essayer de récupérer le userId depuis l'API Discord via ces paramètres
+        // On peut utiliser l'endpoint /api/interactions qui reçoit ces infos
+        fetch(`/api/discord/user-id-from-context?instance_id=${instanceId || ''}&guild_id=${guildId || ''}&channel_id=${channelId || ''}`)
+          .then(response => {
+            if (response.ok) {
+              return response.json();
+            }
+            return null;
+          })
+          .then(data => {
+            if (data && data.success && data.userId) {
+              console.log('[DISCORD] ✅ userId récupéré depuis le contexte Discord:', data.userId);
+              setUserId(data.userId);
+              localStorage.setItem('discord_user_id', data.userId);
+            } else {
+              console.warn('[DISCORD] ⚠️ Impossible de récupérer le userId depuis le contexte Discord');
+            }
+          })
+          .catch(error => {
+            console.error('[DISCORD] Erreur lors de la récupération du userId depuis le contexte:', error);
+          });
+      } else {
+        console.warn('[DISCORD] ⚠️ Aucun paramètre Discord détecté dans l\'URL');
+      }
     }
     
     // Gérer le callback OAuth2

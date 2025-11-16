@@ -23,7 +23,8 @@ if (!BOT_API_KEY) {
 }
 
 // Cache temporaire pour stocker les userIds des activités Discord (expire après 5 minutes)
-const activityUserCache = new Map();
+const activityUserCache = new Map(); // Token -> { userId, expiresAt, createdAt }
+const instanceUserCache = new Map(); // instance_id -> { userId, expiresAt, createdAt }
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
 // Nettoyer le cache périodiquement
@@ -32,6 +33,11 @@ setInterval(() => {
   for (const [key, value] of activityUserCache.entries()) {
     if (now > value.expiresAt) {
       activityUserCache.delete(key);
+    }
+  }
+  for (const [key, value] of instanceUserCache.entries()) {
+    if (now > value.expiresAt) {
+      instanceUserCache.delete(key);
     }
   }
 }, 60000); // Nettoyer toutes les minutes
@@ -183,34 +189,38 @@ app.post('/api/interactions', async (req, res) => {
                     // Générer un token unique pour cette session d'activité
                     const sessionToken = `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                     
-                    // Stocker le userId dans le cache avec expiration
+                    // Stocker le userId dans le cache avec expiration (par token)
                     activityUserCache.set(sessionToken, {
                         userId: userId,
                         expiresAt: Date.now() + CACHE_EXPIRY,
                         createdAt: new Date()
                     });
                     
+                    // Essayer aussi de stocker par instance_id si disponible (pour récupération directe)
+                    // L'instance_id peut être dans les query params de la requête
+                    const instanceId = req.query.instance_id;
+                    if (instanceId) {
+                        instanceUserCache.set(instanceId, {
+                            userId: userId,
+                            expiresAt: Date.now() + CACHE_EXPIRY,
+                            createdAt: new Date()
+                        });
+                        console.log('[INTERACTIONS] userId stocké dans instanceUserCache:', userId, 'instance_id:', instanceId);
+                    }
+                    
                     console.log('[INTERACTIONS] userId stocké dans le cache:', userId, 'token:', sessionToken);
                     
                     const ACTIVITY_URL = process.env.WEB_VERIFICATION_URL || 'https://emynona.shop';
                     // Passer le token dans l'URL pour que l'iframe puisse récupérer le userId
-                    const gameUrl = `${ACTIVITY_URL}/activity?action=${action}&token=${sessionToken}`;
+                    const gameUrl = `${ACTIVITY_URL}/activity?action=${action}&token=${sessionToken}&userId=${userId}`;
                     
                     console.log('[INTERACTIONS] URL générée avec token:', gameUrl);
                     
+                    // Utiliser LAUNCH_ACTIVITY (type 12) pour ouvrir directement dans l'iframe Discord
                     return res.status(200).json({
-                        type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+                        type: 12, // LAUNCH_ACTIVITY
                         data: {
-                            content: '🎰 Système €mynona Coins lancé !',
-                            components: [{
-                                type: 1, // ACTION_ROW
-                                components: [{
-                                    type: 2, // BUTTON
-                                    style: 5, // LINK
-                                    label: '🎲 Accéder au système',
-                                    url: gameUrl
-                                }]
-                            }]
+                            url: gameUrl
                         }
                     });
                 } else {
@@ -218,19 +228,11 @@ app.post('/api/interactions', async (req, res) => {
                     const ACTIVITY_URL = process.env.WEB_VERIFICATION_URL || 'https://emynona.shop';
                     const gameUrl = `${ACTIVITY_URL}/activity`;
                     
+                    // Utiliser LAUNCH_ACTIVITY même sans userId (l'utilisateur devra s'authentifier)
                     return res.status(200).json({
-                        type: 4,
+                        type: 12, // LAUNCH_ACTIVITY
                         data: {
-                            content: '🎰 Système €mynona Coins',
-                            components: [{
-                                type: 1,
-                                components: [{
-                                    type: 2,
-                                    style: 5,
-                                    label: '🎲 Accéder',
-                                    url: gameUrl
-                                }]
-                            }]
+                            url: gameUrl
                         }
                     });
                 }
@@ -661,6 +663,45 @@ app.post('/api/activity/store-token', async (req, res) => {
         res.json({ success: true, message: 'Token stocké' });
     } catch (error) {
         console.error('[ACTIVITY TOKEN] Erreur:', error);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+});
+
+// API pour obtenir le userId depuis le contexte Discord (instance_id, guild_id, channel_id)
+// Cette API est utilisée quand Discord lance l'activité directement sans token
+app.get('/api/discord/user-id-from-context', async (req, res) => {
+    try {
+        const { instance_id, guild_id, channel_id } = req.query;
+        
+        console.log('[DISCORD CONTEXT] Tentative de récupération userId depuis contexte:', {
+            instance_id,
+            guild_id,
+            channel_id
+        });
+        
+        // Méthode 1: Vérifier si on a stocké le userId avec cet instance_id
+        if (instance_id) {
+            const cached = instanceUserCache.get(instance_id);
+            if (cached && Date.now() < cached.expiresAt) {
+                console.log('[DISCORD CONTEXT] ✅ userId récupéré depuis instance_id cache:', cached.userId);
+                return res.json({ success: true, userId: cached.userId });
+            } else if (cached) {
+                // Instance expirée, le supprimer
+                instanceUserCache.delete(instance_id);
+                console.warn('[DISCORD CONTEXT] instance_id expiré:', instance_id);
+            }
+        }
+        
+        // Méthode 2: Malheureusement, Discord ne passe pas directement le userId dans ces paramètres
+        // On ne peut pas récupérer le userId depuis instance_id, guild_id ou channel_id seul
+        // Il faudrait utiliser l'API Discord pour récupérer les membres du channel, mais ça nécessite des permissions
+        
+        // Pour l'instant, on retourne un échec
+        // La solution est d'utiliser la commande /activity qui génère un token avec le userId
+        console.warn('[DISCORD CONTEXT] ⚠️ Impossible de récupérer userId depuis le contexte seul');
+        res.json({ success: false, message: 'userId non disponible depuis le contexte' });
+    } catch (error) {
+        console.error('[DISCORD CONTEXT] Erreur:', error);
         res.status(500).json({ success: false, message: 'Erreur serveur' });
     }
 });

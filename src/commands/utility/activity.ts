@@ -2,7 +2,8 @@ import {
     SlashCommandBuilder,
     EmbedBuilder,
     MessageFlags,
-    ChatInputCommandInteraction
+    ChatInputCommandInteraction,
+    InteractionResponseType
 } from 'discord.js';
 import { Command } from '../../types/command';
 import { logger } from '../../utils/logger';
@@ -111,34 +112,62 @@ export const activity: Command = {
                 }
                 
                 const actionType = action || 'crate';
-                // Passer à la fois le token ET le userId dans l'URL pour double sécurité
+                // Construire l'URL avec le token et userId pour que l'iframe puisse les récupérer
                 const gameUrl = `${ACTIVITY_URL}/activity?action=${actionType}&token=${sessionToken}&userId=${interaction.user.id}`;
                 
-                const embed = new EmbedBuilder()
-                    .setTitle('🎰 Système €mynona Coins')
-                    .setDescription(`Accédez au système de monnaie pour ouvrir des caisses, tourner la roue et gagner des récompenses !`)
-                    .addFields(
+                // Créer une invitation d'activité Discord qui ouvre directement dans l'iframe
+                // Cette méthode utilise l'API Discord pour créer une invitation d'activité
+                const channel = interaction.channel;
+                if (!channel || !channel.isTextBased()) {
+                    throw new Error('Canal invalide pour créer une invitation d\'activité');
+                }
+                
+                // Utiliser l'API REST directement pour envoyer une réponse LAUNCH_ACTIVITY
+                // Type 12 = LAUNCH_ACTIVITY (ouvre directement dans l'iframe Discord)
+                try {
+                    await interaction.client.rest.post(
+                        `/interactions/${interaction.id}/${interaction.token}/callback`,
                         {
-                            name: '📦 Caisses',
-                            value: 'Ouvrez des caisses pour gagner des récompenses exclusives',
-                            inline: true
-                        },
-                        {
-                            name: '🎡 Roue de Réductions',
-                            value: 'Tournez la roue pour gagner des réductions sur vos achats',
-                            inline: true
-                        },
-                        {
-                            name: '🔗 Accès',
-                            value: `[Cliquez ici pour accéder](${gameUrl})`,
-                            inline: false
+                            body: {
+                                type: 12, // LAUNCH_ACTIVITY
+                                data: {
+                                    url: gameUrl
+                                }
+                            }
                         }
-                    )
-                    .setColor('#5865F2')
-                    .setFooter({ text: '€mynona Market • Système de monnaie' })
-                    .setTimestamp();
+                    );
+                    
+                    logger.info(`✅ Activité lancée dans l'iframe Discord pour ${interaction.user.tag}`);
+                } catch (launchError: any) {
+                    logger.warn('Impossible de lancer l\'activité directement, utilisation du fallback:', launchError);
+                    
+                    // Fallback : utiliser un embed avec le lien direct
+                    const embed = new EmbedBuilder()
+                        .setTitle('🎰 Système €mynona Coins')
+                        .setDescription(`Accédez au système de monnaie pour ouvrir des caisses, tourner la roue et gagner des récompenses !`)
+                        .addFields(
+                            {
+                                name: '📦 Caisses',
+                                value: 'Ouvrez des caisses pour gagner des récompenses exclusives',
+                                inline: true
+                            },
+                            {
+                                name: '🎡 Roue de Réductions',
+                                value: 'Tournez la roue pour gagner des réductions sur vos achats',
+                                inline: true
+                            },
+                            {
+                                name: '🔗 Accès',
+                                value: `[Cliquez ici pour accéder](${gameUrl})`,
+                                inline: false
+                            }
+                        )
+                        .setColor('#5865F2')
+                        .setFooter({ text: '€mynona Market • Système de monnaie' })
+                        .setTimestamp();
 
-                await interaction.reply({ embeds: [embed] });
+                    await interaction.reply({ embeds: [embed] });
+                }
             } catch (error: any) {
                 logger.error('Erreur lors du lancement de l\'activité:', error);
                 
