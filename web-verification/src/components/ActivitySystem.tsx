@@ -92,29 +92,40 @@ const ActivitySystem: React.FC = () => {
         }
       });
     } else if (isDiscordIframe) {
-      // Si on est dans un iframe Discord sans token, essayer de récupérer le userId via l'API Discord
+      // Si on est dans un iframe Discord, essayer de récupérer le userId via le SDK Discord
+      console.log('[DISCORD] Détection iframe Discord, récupération du userId...');
       getDiscordUserId().then((discordUserId) => {
         if (discordUserId) {
-          console.log('[DISCORD] userId récupéré depuis Discord:', discordUserId);
+          console.log('[DISCORD] ✅ userId récupéré depuis Discord:', discordUserId);
           setUserId(discordUserId);
-          localStorage.setItem('discord_user_id', discordUserId);
         } else {
-          const storedId = localStorage.getItem('discord_user_id');
+          console.warn('[DISCORD] ⚠️ userId non récupéré, vérification du localStorage...');
+          const storedId = localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id');
           if (storedId) {
+            console.log('[DISCORD] Utilisation du userId stocké:', storedId);
             setUserId(storedId);
+          } else {
+            console.error('[DISCORD] ❌ Aucun userId disponible');
+            setLoading(false);
           }
         }
       }).catch((error) => {
-        console.error('[DISCORD] Erreur lors de la récupération du userId:', error);
-        const storedId = localStorage.getItem('discord_user_id');
+        console.error('[DISCORD] ❌ Erreur lors de la récupération du userId:', error);
+        const storedId = localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id');
         if (storedId) {
+          console.log('[DISCORD] Utilisation du userId stocké après erreur:', storedId);
           setUserId(storedId);
+        } else {
+          setLoading(false);
         }
       });
     } else {
-      const storedId = localStorage.getItem('discord_user_id');
+      // Pas dans un iframe Discord, utiliser le localStorage
+      const storedId = localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id');
       if (storedId) {
         setUserId(storedId);
+      } else {
+        setLoading(false);
       }
     }
 
@@ -237,31 +248,9 @@ const ActivitySystem: React.FC = () => {
 
   const getDiscordUserId = async (): Promise<string | null> => {
     return new Promise(async (resolve) => {
-      // Méthode 1: Vérifier les query params Discord (Discord peut passer des infos via l'URL)
-      const urlParams = new URLSearchParams(window.location.search);
-      const discordUserId = urlParams.get('user_id') || urlParams.get('userId') || urlParams.get('discord_user_id');
-      if (discordUserId) {
-        console.log('[DISCORD] userId trouvé dans URL:', discordUserId);
-        resolve(discordUserId);
-        return;
-      }
-
-      // Méthode 2: Essayer de récupérer depuis l'API serveur (peut avoir des infos Discord)
-      try {
-        const response = await fetch('/api/discord/user-id');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.userId) {
-            console.log('[DISCORD] userId récupéré depuis API:', data.userId);
-            resolve(data.userId);
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('[DISCORD] Erreur API user-id:', error);
-      }
-
-      // Méthode 3: Utiliser Discord Activity SDK si disponible (MÉTHODE PRINCIPALE ET SÉCURISÉE)
+      console.log('[DISCORD] Début de la récupération du userId...');
+      
+      // Méthode 1: Utiliser Discord Activity SDK si disponible (MÉTHODE PRINCIPALE POUR IFRAME)
       // Le SDK Discord est injecté automatiquement dans l'iframe par Discord
       if ((window as any).DiscordSdk) {
         try {
@@ -272,79 +261,134 @@ const ActivitySystem: React.FC = () => {
           await discordSdk.ready();
           console.log('[DISCORD SDK] SDK prêt');
           
-          // FORCER l'authentification OAuth2 pour sécuriser l'accès
-          const CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID || '';
-          if (!CLIENT_ID) {
-            console.error('[DISCORD SDK] REACT_APP_DISCORD_CLIENT_ID non configuré');
-            throw new Error('CLIENT_ID manquant');
-          }
-          
-          console.log('[DISCORD SDK] Demande d\'autorisation OAuth2...');
-          
-          // Demander l'autorisation OAuth2 (obligatoire pour sécuriser)
-          const { code } = await discordSdk.commands.authorize({
-            client_id: CLIENT_ID,
-            response_type: 'code',
-            state: '',
-            prompt: 'none',
-            scope: ['identify'],
-          });
-          
-          console.log('[DISCORD SDK] Code d\'autorisation obtenu');
-          
-          // Échanger le code contre un token (via votre serveur)
-          const tokenResponse = await fetch('/api/discord/oauth-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code }),
-          });
-          
-          if (!tokenResponse.ok) {
-            const errorData = await tokenResponse.json().catch(() => ({}));
-            console.error('[DISCORD SDK] Erreur lors de l\'échange du code:', errorData);
-            throw new Error('Impossible d\'obtenir le token');
-          }
-          
-          const { access_token, user_id } = await tokenResponse.json();
-          
-          if (!access_token) {
-            throw new Error('Token d\'accès non reçu');
-          }
-          
-          console.log('[DISCORD SDK] Token obtenu, authentification...');
-          
-          // Authentifier avec le token
-          await discordSdk.commands.authenticate({ access_token });
-          
-          // Récupérer l'utilisateur authentifié
-          const user = await discordSdk.commands.getUser();
-          
-          if (user?.id) {
-            // Vérifier que le userId correspond bien (sécurité supplémentaire)
-            if (user_id && user.id !== user_id) {
-              console.error('[DISCORD SDK] ⚠️ Incohérence de userId détectée!', { user_id, 'user.id': user.id });
-            }
+          // Essayer d'abord de récupérer l'utilisateur SANS OAuth2 (plus simple et plus rapide)
+          try {
+            console.log('[DISCORD SDK] Tentative de récupération directe de l\'utilisateur...');
+            const user = await discordSdk.commands.getUser();
             
-            console.log('[DISCORD SDK] ✅ Utilisateur authentifié et vérifié:', user);
-            // Stocker le token pour les requêtes futures
-            localStorage.setItem('discord_access_token', access_token);
-            localStorage.setItem('discord_user_id_verified', user.id);
-            resolve(user.id);
-            return;
-          } else {
-            throw new Error('Impossible de récupérer l\'utilisateur après authentification');
+            if (user?.id) {
+              console.log('[DISCORD SDK] ✅ Utilisateur récupéré directement:', user.id);
+              localStorage.setItem('discord_user_id', user.id);
+              resolve(user.id);
+              return;
+            }
+          } catch (getUserError: any) {
+            console.log('[DISCORD SDK] getUser() direct a échoué, tentative avec OAuth2...', getUserError?.message);
+            
+            // Si getUser() échoue, essayer avec OAuth2
+            const CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID || '';
+            if (CLIENT_ID) {
+              try {
+                console.log('[DISCORD SDK] Demande d\'autorisation OAuth2...');
+                
+                // Demander l'autorisation OAuth2
+                const { code } = await discordSdk.commands.authorize({
+                  client_id: CLIENT_ID,
+                  response_type: 'code',
+                  state: '',
+                  prompt: 'none',
+                  scope: ['identify'],
+                });
+                
+                console.log('[DISCORD SDK] Code d\'autorisation obtenu');
+                
+                // Échanger le code contre un token (via votre serveur)
+                const tokenResponse = await fetch('/api/discord/oauth-token', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ code }),
+                });
+                
+                if (!tokenResponse.ok) {
+                  const errorData = await tokenResponse.json().catch(() => ({}));
+                  console.error('[DISCORD SDK] Erreur lors de l\'échange du code:', errorData);
+                  throw new Error('Impossible d\'obtenir le token');
+                }
+                
+                const { access_token, user_id } = await tokenResponse.json();
+                
+                if (!access_token || !user_id) {
+                  throw new Error('Token ou userId manquant');
+                }
+                
+                console.log('[DISCORD SDK] Token obtenu, authentification...');
+                
+                // Authentifier avec le token
+                await discordSdk.commands.authenticate({ access_token });
+                
+                // Récupérer l'utilisateur authentifié
+                const user = await discordSdk.commands.getUser();
+                
+                if (user?.id) {
+                  console.log('[DISCORD SDK] ✅ Utilisateur authentifié:', user.id);
+                  localStorage.setItem('discord_access_token', access_token);
+                  localStorage.setItem('discord_user_id_verified', user.id);
+                  localStorage.setItem('discord_user_id', user.id);
+                  resolve(user.id);
+                  return;
+                } else {
+                  throw new Error('Impossible de récupérer l\'utilisateur après authentification');
+                }
+              } catch (oauthError: any) {
+                console.error('[DISCORD SDK] Erreur OAuth2:', oauthError?.message);
+                // Continuer avec les autres méthodes
+              }
+            }
           }
         } catch (error: any) {
-          console.error('[DISCORD SDK] Erreur lors de l\'authentification:', error);
-          console.error('[DISCORD SDK] Message:', error?.message);
-          console.error('[DISCORD SDK] Stack:', error?.stack);
-          // Ne pas résoudre avec null ici, laisser les autres méthodes essayer
+          console.error('[DISCORD SDK] Erreur générale:', error?.message);
+          // Continuer avec les autres méthodes
         }
       } else {
-        console.log('[DISCORD SDK] SDK non disponible (pas dans un iframe Discord ou SDK non chargé)');
+        console.log('[DISCORD SDK] SDK non disponible');
       }
 
-      // Méthode 4: Utiliser postMessage pour communiquer avec le parent Discord
+      // Méthode 2: Vérifier les query params (userId ou token de session)
+      const urlParams = new URLSearchParams(window.location.search);
+      const discordUserId = urlParams.get('user_id') || urlParams.get('userId') || urlParams.get('discord_user_id');
+      if (discordUserId) {
+        console.log('[DISCORD] userId trouvé dans URL:', discordUserId);
+        localStorage.setItem('discord_user_id', discordUserId);
+        resolve(discordUserId);
+        return;
+      }
+
+      // Méthode 3: Récupérer depuis le token de session (activité Discord lancée via /activity)
+      const token = urlParams.get('token');
+      if (token) {
+        try {
+          const response = await fetch(`/api/discord/user-id?token=${token}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.userId) {
+              console.log('[DISCORD] userId récupéré depuis token de session:', data.userId);
+              localStorage.setItem('discord_user_id', data.userId);
+              resolve(data.userId);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('[DISCORD] Erreur API user-id avec token:', error);
+        }
+      }
+
+      // Méthode 4: Essayer de récupérer depuis l'API serveur (sans token)
+      try {
+        const response = await fetch('/api/discord/user-id');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.userId) {
+            console.log('[DISCORD] userId récupéré depuis API:', data.userId);
+            localStorage.setItem('discord_user_id', data.userId);
+            resolve(data.userId);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('[DISCORD] Erreur API user-id:', error);
+      }
+
+      // Méthode 5: Utiliser postMessage pour communiquer avec le parent Discord
       const messageHandler = (event: MessageEvent) => {
         // Accepter les messages de Discord
         if (event.origin.includes('discord.com') || event.origin.includes('discordapp.com')) {
@@ -354,6 +398,7 @@ const ActivitySystem: React.FC = () => {
               const userId = event.data.user_id || event.data.userId || event.data.user?.id;
               console.log('[DISCORD] userId reçu via postMessage:', userId);
               window.removeEventListener('message', messageHandler);
+              localStorage.setItem('discord_user_id', userId);
               resolve(userId);
               return;
             }
@@ -361,6 +406,7 @@ const ActivitySystem: React.FC = () => {
             if (event.data.type === 'DISCORD_USER_ID') {
               console.log('[DISCORD] userId reçu via postMessage:', event.data.userId);
               window.removeEventListener('message', messageHandler);
+              localStorage.setItem('discord_user_id', event.data.userId);
               resolve(event.data.userId);
               return;
             }
@@ -380,12 +426,18 @@ const ActivitySystem: React.FC = () => {
         }
       }
 
-      // Timeout après 3 secondes
+      // Timeout après 5 secondes (augmenté pour laisser plus de temps au SDK)
       setTimeout(() => {
         window.removeEventListener('message', messageHandler);
-        console.warn('[DISCORD] Timeout - userId non récupéré depuis Discord, utilisation du localStorage');
-        resolve(null);
-      }, 3000);
+        const storedId = localStorage.getItem('discord_user_id');
+        if (storedId) {
+          console.log('[DISCORD] Utilisation du userId stocké:', storedId);
+          resolve(storedId);
+        } else {
+          console.warn('[DISCORD] Timeout - userId non récupéré depuis Discord');
+          resolve(null);
+        }
+      }, 5000);
     });
   };
 
