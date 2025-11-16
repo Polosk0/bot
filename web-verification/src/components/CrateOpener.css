@@ -1,285 +1,441 @@
 .crate-opener {
   min-height: 100vh;
-  padding: 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 0;
+  background: #0a0e27;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
   color: white;
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+  overflow-x: hidden;
 }
 
 .back-button {
   align-self: flex-start;
-  background: rgba(255, 255, 255, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  margin: 2rem 0 0 2rem;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
   padding: 0.75rem 1.5rem;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-  margin-bottom: 2rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .back-button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateX(-5px);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateX(-4px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
 }
 
 .crate-container {
-  max-width: 600px;
+  max-width: 800px;
   width: 100%;
   text-align: center;
+  padding: 2rem;
+  position: relative;
+  z-index: 1;
 }
 
 .crate-container h2 {
-  font-size: 2.5rem;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
   margin-bottom: 1rem;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
 }
 
 .crate-cost {
-  font-size: 1.3rem;
+  font-size: 1.25rem;
   margin-bottom: 0.5rem;
-  color: #ffd700;
-  font-weight: bold;
+  color: #fbbf24;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .balance-info {
-  font-size: 1.1rem;
-  margin-bottom: 2rem;
-  opacity: 0.9;
+  font-size: 1rem;
+  margin-bottom: 2.5rem;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .crate-box {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-radius: 20px;
-  padding: 3rem;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 32px;
+  padding: 4rem 3rem;
   margin-bottom: 3rem;
-  min-height: 400px;
+  min-height: 450px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.crate-box::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+  animation: rotate 20s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .crate-box.opening {
-  animation: crateShake 0.5s infinite;
+  animation: crateShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite;
+  border-color: rgba(168, 85, 247, 0.5);
+  box-shadow: 
+    0 20px 60px rgba(168, 85, 247, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 @keyframes crateShake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-10px) rotate(-5deg); }
-  75% { transform: translateX(10px) rotate(5deg); }
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(-12px) rotate(-3deg); }
+  75% { transform: translateX(12px) rotate(3deg); }
 }
 
 .crate-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
+  gap: 2.5rem;
+  position: relative;
+  z-index: 1;
 }
 
 .crate-icon {
-  font-size: 8rem;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
-  animation: crateFloat 2s ease-in-out infinite;
+  font-size: 10rem;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4));
+  animation: crateFloat 3s ease-in-out infinite;
+  position: relative;
+}
+
+.crate-icon::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120%;
+  height: 120%;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.1); }
 }
 
 @keyframes crateFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-20px); }
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-24px) rotate(5deg); }
 }
 
 .open-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
   border: none;
   color: white;
-  padding: 1rem 2rem;
-  border-radius: 15px;
-  font-size: 1.2rem;
-  font-weight: bold;
+  padding: 1.25rem 3rem;
+  border-radius: 16px;
+  font-size: 1.1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 8px 24px rgba(99, 102, 241, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.open-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.open-button:hover:not(.disabled)::before {
+  left: 100%;
 }
 
 .open-button:hover:not(.disabled) {
-  transform: scale(1.05);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 
+    0 12px 32px rgba(99, 102, 241, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.open-button:active:not(.disabled) {
+  transform: translateY(0) scale(0.98);
 }
 
 .open-button.disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .opening-animation {
   position: relative;
-  width: 200px;
-  height: 200px;
+  width: 300px;
+  height: 300px;
 }
 
 .sparkle {
   position: absolute;
-  font-size: 2rem;
-  animation: sparkleFloat 1.5s ease-in-out infinite;
+  font-size: 2.5rem;
+  animation: sparkleFloat 2s ease-in-out infinite;
+  filter: drop-shadow(0 4px 8px rgba(255, 255, 255, 0.5));
 }
 
 .sparkle:nth-child(1) {
-  top: 0;
+  top: 10%;
   left: 50%;
   animation-delay: 0s;
 }
 
 .sparkle:nth-child(2) {
   top: 50%;
-  left: 0;
-  animation-delay: 0.5s;
+  left: 10%;
+  animation-delay: 0.6s;
 }
 
 .sparkle:nth-child(3) {
   top: 50%;
-  right: 0;
-  animation-delay: 1s;
+  right: 10%;
+  animation-delay: 1.2s;
 }
 
 @keyframes sparkleFloat {
-  0%, 100% { transform: translateY(0) scale(1); opacity: 1; }
-  50% { transform: translateY(-30px) scale(1.5); opacity: 0.5; }
+  0%, 100% { 
+    transform: translateY(0) scale(1) rotate(0deg); 
+    opacity: 1; 
+  }
+  50% { 
+    transform: translateY(-40px) scale(1.3) rotate(180deg); 
+    opacity: 0.7; 
+  }
 }
 
 .reward-result {
   text-align: center;
-  padding: 2rem;
-  border: 3px solid;
-  border-radius: 20px;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-  animation: rewardAppear 0.5s ease-out;
+  padding: 3rem 2.5rem;
+  border: 2px solid;
+  border-radius: 24px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  animation: rewardAppear 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes rewardAppear {
   from {
     opacity: 0;
-    transform: scale(0.5);
+    transform: scale(0.3) rotate(-10deg);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) rotate(0deg);
   }
 }
 
 .reward-emoji {
-  font-size: 6rem;
-  margin-bottom: 1rem;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  font-size: 7rem;
+  margin-bottom: 1.5rem;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+  display: inline-block;
+  animation: rewardBounce 0.6s ease-out 0.3s both;
+}
+
+@keyframes rewardBounce {
+  0% { transform: scale(0) rotate(-180deg); }
+  50% { transform: scale(1.2) rotate(10deg); }
+  100% { transform: scale(1) rotate(0deg); }
 }
 
 .reward-result h3 {
   font-size: 2rem;
+  font-weight: 700;
   margin-bottom: 1rem;
+  letter-spacing: -0.01em;
 }
 
 .rarity-badge {
   display: inline-block;
-  padding: 0.5rem 1rem;
-  border-radius: 10px;
-  font-weight: bold;
-  margin-bottom: 1rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
   text-transform: uppercase;
+  letter-spacing: 0.1em;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .reward-message {
-  margin-bottom: 1.5rem;
-  opacity: 0.9;
-  line-height: 1.6;
+  margin-bottom: 2rem;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.7;
+  font-size: 1rem;
 }
 
 .close-button {
-  background: rgba(255, 255, 255, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: 10px;
+  padding: 0.875rem 2rem;
+  border-radius: 12px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
   transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
 }
 
 .close-button:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
 }
 
 .rewards-preview {
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-  border-radius: 15px;
-  padding: 2rem;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 2.5rem;
   width: 100%;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .rewards-preview h3 {
   font-size: 1.5rem;
-  margin-bottom: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 2rem;
   text-align: center;
+  letter-spacing: -0.01em;
 }
 
 .rewards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1.25rem;
 }
 
 .reward-preview-item {
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid;
-  border-radius: 10px;
-  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid;
+  border-radius: 16px;
+  padding: 1.5rem 1rem;
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.reward-preview-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .preview-emoji {
-  font-size: 2rem;
+  font-size: 2.5rem;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
 }
 
 .preview-name {
   font-size: 0.9rem;
   font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .preview-rarity {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  font-weight: bold;
+  font-weight: 700;
+  letter-spacing: 0.05em;
 }
 
 @media (max-width: 768px) {
   .crate-opener {
-    padding: 1rem;
+    padding: 0;
+  }
+
+  .back-button {
+    margin: 1.5rem 0 0 1.5rem;
+  }
+
+  .crate-container {
+    padding: 1.5rem;
   }
 
   .crate-container h2 {
-    font-size: 2rem;
+    font-size: 1.75rem;
   }
 
   .crate-box {
-    padding: 2rem;
-    min-height: 300px;
+    padding: 3rem 2rem;
+    min-height: 350px;
+    border-radius: 24px;
   }
 
   .crate-icon {
-    font-size: 5rem;
+    font-size: 6rem;
   }
 
   .rewards-grid {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+  }
+
+  .rewards-preview {
+    padding: 2rem 1.5rem;
   }
 }
-

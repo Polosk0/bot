@@ -93,35 +93,35 @@ const ActivitySystem: React.FC = () => {
   return (
     <div className="activity-system">
       <div className="activity-header">
-        <h1>💰 Système €mynona Coins</h1>
+        <h1>€mynona Coins</h1>
         <div className="balance-display">
-          <span className="balance-label">Votre solde:</span>
-          <span className="balance-amount">{balance} €mynona Coins</span>
+          <span className="balance-label">Solde</span>
+          <span className="balance-amount">{balance.toLocaleString()}</span>
         </div>
       </div>
 
       <div className="activity-menu">
         <div className="activity-card" onClick={() => setCurrentAction('crate')}>
           <div className="card-icon">📦</div>
-          <h2>Ouvrir une Caisse</h2>
-          <p>Dépensez vos coins pour ouvrir des caisses et gagner des récompenses exclusives</p>
-          <div className="card-cost">Coût: 100 coins</div>
+          <h2>Caisse Premium</h2>
+          <p>Ouvrez des caisses exclusives et découvrez des récompenses exceptionnelles</p>
+          <div className="card-cost">100 coins</div>
         </div>
 
         <div className="activity-card" onClick={() => setCurrentAction('wheel')}>
           <div className="card-icon">🎡</div>
-          <h2>Roue de Réductions</h2>
-          <p>Tournez la roue pour gagner des réductions sur vos prochains achats</p>
-          <div className="card-cost">Coût: 50 coins</div>
+          <h2>Roue de la Fortune</h2>
+          <p>Tentez votre chance et remportez des réductions sur vos prochaines commandes</p>
+          <div className="card-cost">50 coins</div>
         </div>
       </div>
 
       <div className="activity-info">
-        <h3>💡 Comment obtenir des €mynona Coins ?</h3>
+        <h3>Comment gagner des coins ?</h3>
         <ul>
-          <li>👥 Invitez des membres sur le serveur (paliers de récompenses)</li>
-          <li>💎 Soyez un client fidèle (récompenses basées sur votre Rank Factor)</li>
-          <li>🎁 Participez aux événements spéciaux</li>
+          <li>Invitez des membres sur le serveur et atteignez des paliers de récompenses</li>
+          <li>Restez fidèle et bénéficiez de récompenses basées sur votre Rank Factor</li>
+          <li>Participez aux événements spéciaux et aux promotions exclusives</li>
         </ul>
       </div>
     </div>
