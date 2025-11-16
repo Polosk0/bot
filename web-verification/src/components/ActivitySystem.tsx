@@ -98,15 +98,37 @@ const ActivitySystem: React.FC = () => {
         if (discordUserId) {
           console.log('[DISCORD] ✅ userId récupéré depuis Discord:', discordUserId);
           setUserId(discordUserId);
+          // Forcer immédiatement la récupération du solde
+          setTimeout(() => {
+            fetchBalanceWithId(discordUserId).catch(err => {
+              console.error('[DISCORD] Erreur lors de fetchBalanceWithId:', err);
+            });
+          }, 100);
         } else {
           console.warn('[DISCORD] ⚠️ userId non récupéré, vérification du localStorage...');
           const storedId = localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id');
           if (storedId) {
             console.log('[DISCORD] Utilisation du userId stocké:', storedId);
             setUserId(storedId);
+            // Forcer immédiatement la récupération du solde
+            setTimeout(() => {
+              fetchBalanceWithId(storedId).catch(err => {
+                console.error('[DISCORD] Erreur lors de fetchBalanceWithId:', err);
+              });
+            }, 100);
           } else {
             console.error('[DISCORD] ❌ Aucun userId disponible');
-            setLoading(false);
+            // Attendre encore un peu au cas où le SDK Discord met du temps
+            setTimeout(() => {
+              const retryId = localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id');
+              if (retryId) {
+                console.log('[DISCORD] Retry: userId trouvé:', retryId);
+                setUserId(retryId);
+                fetchBalanceWithId(retryId);
+              } else {
+                setLoading(false);
+              }
+            }, 3000);
           }
         }
       }).catch((error) => {
@@ -115,6 +137,7 @@ const ActivitySystem: React.FC = () => {
         if (storedId) {
           console.log('[DISCORD] Utilisation du userId stocké après erreur:', storedId);
           setUserId(storedId);
+          fetchBalanceWithId(storedId);
         } else {
           setLoading(false);
         }
@@ -133,6 +156,54 @@ const ActivitySystem: React.FC = () => {
       setCurrentAction(action);
     }
   }, []);
+
+  // Fonction pour récupérer le solde avec un userId spécifique
+  const fetchBalanceWithId = async (id: string) => {
+    try {
+      console.log('[BALANCE] Début de la récupération du solde pour userId:', id);
+      
+      // Récupérer le token OAuth pour vérification
+      const accessToken = localStorage.getItem('discord_access_token');
+      
+      const url = accessToken 
+        ? `/api/currency/balance?userId=${id}&access_token=${encodeURIComponent(accessToken)}`
+        : `/api/currency/balance?userId=${id}`;
+      
+      console.log('[BALANCE] URL de la requête:', url);
+      const response = await fetch(url);
+      console.log('[BALANCE] Réponse reçue:', response.status, response.statusText);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[BALANCE] ✅ Données reçues:', data);
+        const balanceValue = data.balance || 0;
+        console.log('[BALANCE] ✅ Solde défini à:', balanceValue);
+        setBalance(balanceValue);
+        setLoading(false);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[BALANCE] ❌ Erreur HTTP:', response.status, errorData);
+        
+        // Si erreur 403, c'est une tentative de fraude détectée
+        if (response.status === 403) {
+          alert('⚠️ Erreur de sécurité : Le userId ne correspond pas à votre compte authentifié.');
+          // Nettoyer et forcer la ré-authentification
+          localStorage.removeItem('discord_access_token');
+          localStorage.removeItem('discord_user_id_verified');
+          localStorage.removeItem('discord_user_id');
+          window.location.reload();
+        } else if (response.status === 400) {
+          console.error('[BALANCE] ❌ userId manquant ou invalide dans la requête');
+        } else {
+          console.error('[BALANCE] ❌ Erreur serveur:', response.status);
+        }
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('[BALANCE] ❌ Erreur lors de la récupération du solde:', error);
+      setLoading(false);
+    }
+  };
 
   const getDiscordUserIdFromToken = async (token: string): Promise<string | null> => {
     try {
@@ -442,60 +513,46 @@ const ActivitySystem: React.FC = () => {
   };
 
   useEffect(() => {
-    if (userId) {
-      fetchBalance();
-    } else {
-      const storedId = localStorage.getItem('discord_user_id');
-      if (storedId) {
-        setUserId(storedId);
+    // Essayer de récupérer le userId et le solde
+    const attemptFetchBalance = async () => {
+      const id = userId || localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id');
+      
+      if (id) {
+        console.log('[BALANCE] userId disponible, récupération du solde...', id);
+        // Si userId n'est pas encore défini dans le state, le définir
+        if (!userId && id) {
+          setUserId(id);
+        }
+        // Appeler fetchBalance avec l'id
+        await fetchBalanceWithId(id);
       } else {
-        setLoading(false);
+        console.warn('[BALANCE] ⚠️ Aucun userId disponible, attente...');
+        // Attendre un peu et réessayer (pour le cas où le SDK Discord met du temps)
+        setTimeout(() => {
+          const retryId = localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id');
+          if (retryId) {
+            console.log('[BALANCE] Retry: userId trouvé après attente:', retryId);
+            setUserId(retryId);
+            fetchBalanceWithId(retryId);
+          } else {
+            console.error('[BALANCE] ❌ Aucun userId disponible après attente');
+            setLoading(false);
+          }
+        }, 2000);
       }
-    }
+    };
+
+    attemptFetchBalance();
   }, [userId]);
 
   const fetchBalance = async () => {
-    try {
-      const id = userId || localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id');
-      if (!id) {
-        setLoading(false);
-        return;
-      }
-
-      // Récupérer le token OAuth pour vérification
-      const accessToken = localStorage.getItem('discord_access_token');
-      
-      console.log('[BALANCE] Récupération du solde pour userId:', id);
-      const url = accessToken 
-        ? `/api/currency/balance?userId=${id}&access_token=${encodeURIComponent(accessToken)}`
-        : `/api/currency/balance?userId=${id}`;
-      
-      const response = await fetch(url);
-      console.log('[BALANCE] Réponse:', response.status, response.statusText);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[BALANCE] Données reçues:', data);
-        setBalance(data.balance || 0);
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[BALANCE] Erreur:', errorData);
-        
-        // Si erreur 403, c'est une tentative de fraude détectée
-        if (response.status === 403) {
-          alert('⚠️ Erreur de sécurité : Le userId ne correspond pas à votre compte authentifié.');
-          // Nettoyer et forcer la ré-authentification
-          localStorage.removeItem('discord_access_token');
-          localStorage.removeItem('discord_user_id_verified');
-          localStorage.removeItem('discord_user_id');
-          window.location.reload();
-        }
-      }
-    } catch (error) {
-      console.error('Erreur lors de la récupération du solde:', error);
-    } finally {
+    const id = userId || localStorage.getItem('discord_user_id_verified') || localStorage.getItem('discord_user_id');
+    if (!id) {
+      console.warn('[BALANCE] ⚠️ Aucun userId disponible pour fetchBalance');
       setLoading(false);
+      return;
     }
+    await fetchBalanceWithId(id);
   };
 
   const handleBalanceUpdate = (newBalance: number) => {
@@ -574,4 +631,5 @@ const ActivitySystem: React.FC = () => {
 };
 
 export default ActivitySystem;
+
 
