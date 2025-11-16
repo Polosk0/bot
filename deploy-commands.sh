@@ -28,7 +28,7 @@ fi
 
 # Redémarrer le bot
 echo "🔄 Redémarrage du bot..."
-pm2 restart bot-discord
+pm2 restart discord-bot
 
 # Attendre que le bot démarre
 echo "⏳ Attente du démarrage du bot..."
@@ -36,7 +36,7 @@ sleep 5
 
 # Vérifier les logs
 echo "📋 Vérification des logs de synchronisation..."
-pm2 logs bot-discord --lines 100 | grep -E "Synchronisation|synchronisées|Commandes:|balance|rewards|add-coins|sync-commands" | tail -20
+pm2 logs discord-bot --lines 100 | grep -E "Synchronisation|synchronisées|Commandes:|balance|rewards|add-coins|sync-commands" | tail -20
 
 echo ""
 echo "✅ Déploiement terminé!"
