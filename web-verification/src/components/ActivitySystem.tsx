@@ -16,9 +16,32 @@ const ActivitySystem: React.FC = () => {
     const action = urlParams.get('action') as ActivityAction;
     const id = urlParams.get('userId');
     
+    // Détecter si on est dans un iframe Discord
+    const isDiscordIframe = window.self !== window.top;
+    
     if (id) {
       setUserId(id);
       localStorage.setItem('discord_user_id', id);
+    } else if (isDiscordIframe) {
+      // Si on est dans un iframe Discord, essayer de récupérer le userId via l'API Discord
+      getDiscordUserId().then((discordUserId) => {
+        if (discordUserId) {
+          console.log('[DISCORD] userId récupéré depuis Discord:', discordUserId);
+          setUserId(discordUserId);
+          localStorage.setItem('discord_user_id', discordUserId);
+        } else {
+          const storedId = localStorage.getItem('discord_user_id');
+          if (storedId) {
+            setUserId(storedId);
+          }
+        }
+      }).catch((error) => {
+        console.error('[DISCORD] Erreur lors de la récupération du userId:', error);
+        const storedId = localStorage.getItem('discord_user_id');
+        if (storedId) {
+          setUserId(storedId);
+        }
+      });
     } else {
       const storedId = localStorage.getItem('discord_user_id');
       if (storedId) {
@@ -30,6 +53,92 @@ const ActivitySystem: React.FC = () => {
       setCurrentAction(action);
     }
   }, []);
+
+  const getDiscordUserId = async (): Promise<string | null> => {
+    return new Promise(async (resolve) => {
+      // Méthode 1: Vérifier les query params Discord (Discord peut passer des infos via l'URL)
+      const urlParams = new URLSearchParams(window.location.search);
+      const discordUserId = urlParams.get('user_id') || urlParams.get('userId') || urlParams.get('discord_user_id');
+      if (discordUserId) {
+        console.log('[DISCORD] userId trouvé dans URL:', discordUserId);
+        resolve(discordUserId);
+        return;
+      }
+
+      // Méthode 2: Essayer de récupérer depuis l'API serveur (peut avoir des infos Discord)
+      try {
+        const response = await fetch('/api/discord/user-id');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.userId) {
+            console.log('[DISCORD] userId récupéré depuis API:', data.userId);
+            resolve(data.userId);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('[DISCORD] Erreur API user-id:', error);
+      }
+
+      // Méthode 3: Utiliser Discord Activity SDK si disponible
+      if ((window as any).DiscordSdk) {
+        try {
+          const discordSdk = (window as any).DiscordSdk;
+          const user = await discordSdk.commands.getUser();
+          if (user?.id) {
+            console.log('[DISCORD SDK] Utilisateur récupéré:', user);
+            resolve(user.id);
+            return;
+          }
+        } catch (error) {
+          console.error('[DISCORD SDK] Erreur:', error);
+        }
+      }
+
+      // Méthode 4: Utiliser postMessage pour communiquer avec le parent Discord
+      const messageHandler = (event: MessageEvent) => {
+        // Accepter les messages de Discord
+        if (event.origin.includes('discord.com') || event.origin.includes('discordapp.com')) {
+          if (event.data && typeof event.data === 'object') {
+            // Discord peut envoyer des données utilisateur
+            if (event.data.user_id || event.data.userId || event.data.user?.id) {
+              const userId = event.data.user_id || event.data.userId || event.data.user?.id;
+              console.log('[DISCORD] userId reçu via postMessage:', userId);
+              window.removeEventListener('message', messageHandler);
+              resolve(userId);
+              return;
+            }
+            
+            if (event.data.type === 'DISCORD_USER_ID') {
+              console.log('[DISCORD] userId reçu via postMessage:', event.data.userId);
+              window.removeEventListener('message', messageHandler);
+              resolve(event.data.userId);
+              return;
+            }
+          }
+        }
+      };
+
+      window.addEventListener('message', messageHandler);
+
+      // Demander le userId au parent Discord
+      if (window.parent && window.parent !== window) {
+        try {
+          window.parent.postMessage({ type: 'GET_DISCORD_USER_ID' }, '*');
+          window.parent.postMessage({ type: 'REQUEST_USER_ID' }, '*');
+        } catch (error) {
+          console.error('[DISCORD] Erreur postMessage:', error);
+        }
+      }
+
+      // Timeout après 3 secondes
+      setTimeout(() => {
+        window.removeEventListener('message', messageHandler);
+        console.warn('[DISCORD] Timeout - userId non récupéré depuis Discord, utilisation du localStorage');
+        resolve(null);
+      }, 3000);
+    });
+  };
 
   useEffect(() => {
     if (userId) {

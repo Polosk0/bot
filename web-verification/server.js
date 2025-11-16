@@ -452,14 +452,37 @@ app.post('/api/verify', async (req, res) => {
 });
 
 
+// API pour obtenir le userId depuis Discord (pour les iframes)
+app.get('/api/discord/user-id', async (req, res) => {
+    try {
+        // Cette API peut être appelée depuis l'iframe pour obtenir le userId
+        // Discord peut passer des informations via des headers ou query params
+        const userId = req.query.user_id || req.query.userId || req.headers['x-discord-user-id'];
+        
+        if (userId) {
+            console.log('[DISCORD] userId récupéré:', userId);
+            return res.json({ success: true, userId });
+        }
+
+        // Si pas de userId, retourner null (l'application devra utiliser localStorage ou autre méthode)
+        res.json({ success: false, message: 'userId non disponible' });
+    } catch (error) {
+        console.error('[DISCORD] Erreur:', error);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+});
+
 // API pour obtenir le solde d'un utilisateur
 app.get('/api/currency/balance', async (req, res) => {
     try {
         const { userId } = req.query;
         
         if (!userId) {
+            console.warn('[CURRENCY] userId manquant dans la requête');
             return res.status(400).json({ success: false, message: 'userId manquant' });
         }
+
+        console.log('[CURRENCY] Récupération du solde pour userId:', userId);
 
         if (!BOT_API_URL || !BOT_API_KEY) {
             return res.status(500).json({ success: false, message: 'Configuration manquante' });
@@ -474,10 +497,13 @@ app.get('/api/currency/balance', async (req, res) => {
         });
 
         if (!botResponse.ok) {
+            const errorText = await botResponse.text();
+            console.error('[CURRENCY] Erreur du bot:', botResponse.status, errorText);
             return res.status(botResponse.status).json({ success: false, message: 'Erreur du serveur bot' });
         }
 
         const data = await botResponse.json();
+        console.log('[CURRENCY] Solde récupéré:', data);
         res.json(data);
     } catch (error) {
         console.error('[CURRENCY] Erreur:', error);
