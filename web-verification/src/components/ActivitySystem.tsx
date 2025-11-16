@@ -22,6 +22,17 @@ const ActivitySystem: React.FC = () => {
     // Détecter si on est dans un iframe Discord
     const isDiscordIframe = window.self !== window.top;
     
+    // VÉRIFICATION CRITIQUE : Si on est dans un iframe Discord mais qu'il n'y a pas de token/userId dans l'URL,
+    // cela signifie que Discord a chargé l'activité directement depuis l'URL configurée dans le Developer Portal.
+    // Dans ce cas, on doit utiliser la commande /activity pour obtenir le userId.
+    if (isDiscordIframe && !token && !id) {
+      console.warn('[DISCORD] ⚠️ Aucun token/userId dans l\'URL - Discord a chargé l\'activité directement');
+      console.warn('[DISCORD] ⚠️ L\'utilisateur doit utiliser la commande /activity pour obtenir le userId');
+      
+      // Essayer quand même de récupérer depuis l'API (peut-être que Discord a stocké quelque chose)
+      // Mais on affichera un message d'erreur si ça ne fonctionne pas
+    }
+    
     // Gérer le callback OAuth2
     if (code) {
       handleOAuth2Callback(code, state || undefined).then((authenticatedUserId) => {
@@ -527,16 +538,22 @@ const ActivitySystem: React.FC = () => {
       }
 
       // Méthode 4: Essayer de récupérer depuis l'API serveur (sans token)
+      // Cette méthode peut fonctionner si Discord a stocké le userId quelque part
       try {
+        console.log('[DISCORD] Tentative de récupération depuis API serveur...');
         const response = await fetch('/api/discord/user-id');
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.userId) {
-            console.log('[DISCORD] userId récupéré depuis API:', data.userId);
+            console.log('[DISCORD] ✅ userId récupéré depuis API serveur:', data.userId);
             localStorage.setItem('discord_user_id', data.userId);
             resolve(data.userId);
             return;
+          } else {
+            console.warn('[DISCORD] API serveur n\'a pas retourné de userId:', data);
           }
+        } else {
+          console.warn('[DISCORD] API serveur a retourné une erreur:', response.status);
         }
       } catch (error) {
         console.error('[DISCORD] Erreur API user-id:', error);
@@ -746,28 +763,72 @@ const ActivitySystem: React.FC = () => {
   }
 
   if (!userId && !loading) {
+    const isDiscordIframe = window.self !== window.top;
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasTokenOrUserId = urlParams.get('token') || urlParams.get('userId');
+    
     return (
       <div className="activity-system">
-        <div className="error-container" style={{ textAlign: 'center', padding: '2rem' }}>
-          <h2>⚠️ Connexion requise</h2>
-          <p>Impossible de récupérer votre identifiant Discord.</p>
-          <p style={{ marginTop: '1rem' }}>
-            Veuillez utiliser la commande <code>/activity</code> dans Discord pour accéder au système.
+        <div className="error-container" style={{ textAlign: 'center', padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
+          <h2 style={{ color: '#fbbf24', marginBottom: '1rem' }}>⚠️ Connexion requise</h2>
+          <p style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>
+            Impossible de récupérer votre identifiant Discord.
           </p>
+          
+          {isDiscordIframe && !hasTokenOrUserId ? (
+            <>
+              <div style={{ 
+                backgroundColor: 'rgba(88, 101, 242, 0.1)', 
+                border: '1px solid #5865F2', 
+                borderRadius: '8px', 
+                padding: '1.5rem', 
+                marginTop: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                <h3 style={{ color: '#5865F2', marginBottom: '0.5rem' }}>📋 Instructions</h3>
+                <p style={{ marginBottom: '0.5rem' }}>
+                  Pour accéder au système €mynona Coins, vous devez utiliser la commande dans Discord :
+                </p>
+                <code style={{ 
+                  display: 'block', 
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)', 
+                  padding: '0.75rem', 
+                  borderRadius: '4px',
+                  fontSize: '1.1rem',
+                  color: '#fbbf24',
+                  marginTop: '0.5rem'
+                }}>
+                  /activity
+                </code>
+                <p style={{ marginTop: '1rem', fontSize: '0.9rem', opacity: 0.8 }}>
+                  Cette commande génère un lien sécurisé avec votre identifiant Discord.
+                </p>
+              </div>
+            </>
+          ) : (
+            <p style={{ marginTop: '1rem' }}>
+              Veuillez utiliser la commande <code>/activity</code> dans Discord pour accéder au système.
+            </p>
+          )}
+          
           <button 
             onClick={() => window.location.reload()} 
             style={{ 
-              marginTop: '1rem', 
+              marginTop: '1.5rem', 
               padding: '0.75rem 1.5rem', 
               backgroundColor: '#5865F2', 
               color: 'white', 
               border: 'none', 
               borderRadius: '8px', 
               cursor: 'pointer',
-              fontSize: '1rem'
+              fontSize: '1rem',
+              fontWeight: '600',
+              transition: 'background-color 0.2s'
             }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#4752C4'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#5865F2'}
           >
-            Réessayer
+            🔄 Réessayer
           </button>
         </div>
       </div>
